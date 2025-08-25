@@ -109,5 +109,100 @@ def get_slice_info(trace_path: str, slice_name: str) -> str:
 
 
 
+@mcp.tool()
+def execute_sql_query(trace_path: str, sql_query: str) -> str:
+    """
+    Execute any SQL query on a Perfetto trace and return results in JSON format.
+    Results are limited to a maximum of 50 rows for performance.
+
+    Parameters
+    ----------
+    trace_path : str
+        Path to the Perfetto trace file.
+    sql_query : str
+        The SQL query to execute against the trace database.
+
+    Returns
+    -------
+    str
+        JSON string containing the query results with columns and rows,
+        or an error message if the query fails.
+    """
+    try:
+        # Connect to the Perfetto trace
+        tp = TraceProcessor(trace=trace_path)
+        
+        # Add LIMIT 50 to the query if it doesn't already have a LIMIT clause
+        query_upper = sql_query.upper()
+        if 'LIMIT' not in query_upper:
+            # Remove trailing semicolon if present
+            if sql_query.rstrip().endswith(';'):
+                sql_query = sql_query.rstrip()[:-1]
+            sql_query = f"{sql_query} LIMIT 50"
+        
+        # Execute the query
+        qr_it = tp.query(sql_query)
+        
+        # Collect results
+        rows = []
+        columns = None
+        
+        for row in qr_it:
+            # Get column names from the first row
+            if columns is None:
+                columns = list(row.__dict__.keys())
+            
+            # Convert row to dictionary
+            row_dict = {}
+            for col in columns:
+                value = getattr(row, col)
+                # Convert any non-JSON-serializable types to strings
+                if value is not None and not isinstance(value, (str, int, float, bool)):
+                    value = str(value)
+                row_dict[col] = value
+            
+            rows.append(row_dict)
+            
+            # Enforce the 50 row limit even if the query had a higher LIMIT
+            if len(rows) >= 50:
+                break
+        
+        # Create result dictionary
+        result = {
+            "success": True,
+            "query": sql_query,
+            "columns": columns if columns else [],
+            "rows": rows,
+            "row_count": len(rows),
+            "limited_to_50": len(rows) == 50
+        }
+        
+        return json.dumps(result, indent=2)
+        
+    except FileNotFoundError as fnf:
+        error_result = {
+            "success": False,
+            "error": "File not found",
+            "message": f"Failed to open the trace file. Please double-check the trace_path. Error: {str(fnf)}"
+        }
+        return json.dumps(error_result, indent=2)
+        
+    except Exception as e:
+        error_result = {
+            "success": False,
+            "error": type(e).__name__,
+            "message": f"Query execution failed: {str(e)}",
+            "query": sql_query
+        }
+        return json.dumps(error_result, indent=2)
+        
+    finally:
+        # Always close the trace processor
+        if 'tp' in locals():
+            tp.close()
+
+
+
+
 if __name__ == "__main__":
     mcp.run(transport="stdio")
