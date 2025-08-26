@@ -12,17 +12,7 @@ class SqlQueryTool(BaseTool):
     """Tool for executing arbitrary SQL queries on Perfetto traces."""
     
     def execute_sql_query(self, trace_path: str, sql_query: str) -> str:
-        """Execute any SQL query on a Perfetto trace and return results in JSON format.
-        Results are limited to a maximum of 50 rows for performance.
-
-        Args:
-            trace_path: Path to the Perfetto trace file.
-            sql_query: The SQL query to execute against the trace database.
-
-        Returns:
-            str: JSON string containing the query results with columns and rows,
-                 or an error message if the query fails.
-        """
+        """Implementation for executing SQL queries with validation and result formatting."""
         # Validate query for safety
         if not validate_sql_query(sql_query):
             error_result = {

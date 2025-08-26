@@ -10,15 +10,7 @@ class SliceInfoTool(BaseTool):
     """Tool for retrieving information about slices with a given name."""
     
     def get_slice_info(self, trace_path: str, slice_name: str) -> str:
-        """Retrieve information about slices with a given name from a Perfetto trace.
-
-        Args:
-            trace_path: Path to the Perfetto trace file.
-            slice_name: Name of the slice you want to inspect.
-
-        Returns:
-            str: Summary including the total number of matching slices and a few example rows.
-        """
+        """Implementation for filtering and retrieving slice information by name."""
         def _get_slice_info_operation(tp):
             """Internal operation to get slice info."""
             result = []

@@ -10,14 +10,7 @@ class TraceDataTool(BaseTool):
     """Tool for retrieving basic trace data and statistics."""
     
     def get_trace_data(self, trace_path: str) -> str:
-        """Get trace data from a trace file.
-        
-        Args:
-            trace_path: Path to the Perfetto trace file
-            
-        Returns:
-            str: Basic trace information including slice count and sample data
-        """
+        """Implementation for getting basic trace statistics."""
         def _get_trace_data_operation(tp):
             """Internal operation to get trace data."""
             result = []
