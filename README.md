@@ -18,6 +18,9 @@ src/perfetto_mcp/
 ├── __init__.py              # Package initialization
 ├── server.py                # Main MCP server setup with lifecycle management
 ├── connection_manager.py    # Persistent TraceProcessor connection management
+├── resource/                # MCP resources registration
+│   ├── __init__.py          # register_resources(mcp)
+│   └── concepts.py          # concepts markdown as FileResource
 ├── tools/
 │   ├── __init__.py
 │   ├── base.py              # Base tool class with connection management
@@ -45,6 +48,14 @@ Filter slices by name with counts and sample data.
 
 ### 3. `execute_sql_query(trace_path, sql_query)`
 Execute arbitrary SQL queries against the trace database (limited to 50 rows for performance).
+
+## MCP Resources
+
+- `resource://perfetto-mcp/concepts`
+  - Text/Markdown reference for Perfetto analysis concepts and workflows
+  - Backed by: `docs/Perfetto-MCP-Concepts.md`
+  - MIME: `text/markdown`
+  - Discover via `list_resources`, read via `read_resource`
 
 ## Development Commands
 
@@ -94,3 +105,11 @@ The server implements multiple cleanup strategies:
 - Primary: `atexit` handlers for normal shutdown
 - Secondary: Signal handlers for SIGTERM/SIGINT
 - Graceful: Proper connection cleanup in all scenarios
+
+
+## Reference Documents
+
+- MCP Server: https://modelcontextprotocol.io/quickstart/server
+- Python MCP SDK: https://github.com/modelcontextprotocol/python-sdk
+- Perfetto Trace Analysis: https://perfetto.dev/docs/analysis/getting-started
+- Perfetto TraceProcessor: https://perfetto.dev/docs/analysis/trace-processor-python

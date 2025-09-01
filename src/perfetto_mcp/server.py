@@ -7,6 +7,7 @@ from .connection_manager import ConnectionManager
 from .tools.trace_data import TraceDataTool
 from .tools.slice_info import SliceInfoTool
 from .tools.sql_query import SqlQueryTool
+from .resource import register_resources
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -172,7 +173,10 @@ def create_server() -> FastMCP:
     
     # Setup cleanup using atexit - the simplest and most reliable approach
     atexit.register(connection_manager.cleanup)
-    
+
+    # Register MCP resources in dedicated module
+    register_resources(mcp)
+
     logger.info("Perfetto MCP server created with connection management")
-    
+
     return mcp

@@ -21,13 +21,17 @@ def setup_signal_handlers():
     signal.signal(signal.SIGTERM, signal_handler)  # Termination signal
 
 
+# Expose a module-level FastMCP server instance for dev tooling.
+# Tools like `mcp dev main.py` expect a top-level variable named `mcp`, `server`, or `app`.
+mcp = create_server()
+
+
 if __name__ == "__main__":
     # Setup signal handling before starting server
     setup_signal_handlers()
-    
+
     try:
-        # Create and run the server
-        mcp = create_server()
+        # Run the already-created server over stdio
         mcp.run(transport="stdio")
     except KeyboardInterrupt:
         logger.info("Received keyboard interrupt, shutting down gracefully...")
