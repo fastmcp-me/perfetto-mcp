@@ -20,7 +20,8 @@ src/perfetto_mcp/
 ├── connection_manager.py    # Persistent TraceProcessor connection management
 ├── resource/                # MCP resources registration
 │   ├── __init__.py          # register_resources(mcp)
-│   └── concepts.py          # concepts markdown as FileResource
+│   ├── concepts.py          # concepts markdown as FileResource
+│   └── trace_analysis.py    # trace analysis URL resource
 ├── tools/
 │   ├── __init__.py
 │   ├── base.py              # Base tool class with connection management
@@ -56,6 +57,12 @@ Execute arbitrary SQL queries against the trace database (limited to 50 rows for
   - Backed by: `docs/Perfetto-MCP-Concepts.md`
   - MIME: `text/markdown`
   - Discover via `list_resources`, read via `read_resource`
+
+- `resource://perfetto-docs/trace-analysis-getting-started`
+  - URL resource pointing to official Perfetto trace analysis documentation
+  - References: `https://perfetto.dev/docs/analysis/getting-started`
+  - MIME: `text/markdown`
+  - Provides context for using MCP tools with official Perfetto workflow guidance
 
 ## Development Commands
 

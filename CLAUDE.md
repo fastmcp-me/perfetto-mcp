@@ -77,6 +77,36 @@ All tools inherit from `BaseTool` with:
 **Dependencies:**
 - Requires Python >=3.13
 - Key packages: `mcp[cli]`, `perfetto`, `protobuf<5`
+- Uses `uv` for dependency management and virtual environments
+
+## MCP Resources
+
+The server provides MCP resources for documentation:
+
+- **`resource://perfetto-mcp/concepts`**
+  - Text/Markdown reference for Perfetto analysis concepts and workflows
+  - Backed by: `docs/Perfetto-MCP-Concepts.md`
+  - MIME: `text/markdown`
+  - Access via: `list_resources` and `read_resource` tools
+
+- **`resource://perfetto-docs/trace-analysis-getting-started`**
+  - URL resource pointing to official Perfetto trace analysis documentation
+  - References: `https://perfetto.dev/docs/analysis/getting-started`
+  - MIME: `text/markdown`
+  - Provides context for using MCP tools with official Perfetto workflow guidance
+
+## Coding Standards & Conventions
+
+**Code Style:**
+- Python style: PEP 8, 4-space indentation, line length ~100
+- Naming: `snake_case` for functions/vars, `CapWords` for classes, module files in `snake_case`
+- Type hints: Use `typing` annotations and docstrings for public tools
+- MCP tools: Decorate with `@mcp.tool()` and return concise, user-facing strings or JSON
+
+**Security Guidelines:**
+- Never commit trace files; add large traces to `.gitignore` and reference local paths
+- SQL safety: Avoid interpolating untrusted input into queries; validate/escape user-provided strings and keep row limits (e.g., `LIMIT 50`)
+- Only SELECT queries allowed for security (validated in `utils/query_helpers.py`)
 
 ## Key Design Decisions
 
@@ -90,3 +120,26 @@ All tools inherit from `BaseTool` with:
 - Automatic reconnection attempts on connection failures
 - Preserve original error messages for backward compatibility
 - Don't close connections on query errors (only on connection failures)
+
+## Development Workflow
+
+**Adding New Tools:**
+- Add tools in individual modules under `src/perfetto_mcp/tools/`
+- Inherit from `BaseTool` for connection management and error handling
+- Register with `@mcp.tool()` decorator in the server
+- Ensure resources are properly managed (connections closed in `finally` blocks)
+- Provide clear parameter documentation and predictable return shapes
+
+**Testing Guidelines:**
+- Framework: Prefer `pytest` with tests under `tests/` mirroring module names
+- Naming: `test_<module>.py` and `test_<behavior>()` function names
+- Coverage: Focus on critical path coverage of tool functions and error handling
+- Running: `uv run pytest -q` (add `-k <expr>` to filter)
+
+**Module Structure:**
+- Entry point: `main.py` - MCP server entrypoint exposing Perfetto tools
+- Core server: `src/perfetto_mcp/server.py` - FastMCP server with lifecycle management
+- Connection management: `src/perfetto_mcp/connection_manager.py` - Persistent TraceProcessor connections
+- Tools: `src/perfetto_mcp/tools/` - Individual tool implementations inheriting from `BaseTool`
+- Utilities: `src/perfetto_mcp/utils/` - SQL utilities and validation helpers
+- Resources: `src/perfetto_mcp/resource/` - MCP resources registration and management

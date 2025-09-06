@@ -43,13 +43,16 @@ The official guide covers:
 When using this MCP server's tools, the official documentation provides essential context for:
 
 1. **PerfettoSQL**: The SQL dialect used by `execute_sql_query` tool
+ - https://perfetto.dev/docs/analysis/perfetto-sql-getting-started
 2. **Trace Processor**: The engine behind all MCP tools in this server
+ - https://perfetto.dev/docs/analysis/trace-processor-python
 3. **Analysis Workflow**: How to progress from basic to advanced analysis
 4. **Standard Library**: Pre-built functions available in queries
+ - https://perfetto.dev/docs/analysis/stdlib-docs
 
 ## Recommended Reading Order
 
-1. Start with the getting started guide (link above)
+1. Start with the getting started guid`e (link above)
 2. Learn PerfettoSQL syntax and concepts  
 3. Explore the standard library modules
 4. Try the interactive tools alongside this MCP server
