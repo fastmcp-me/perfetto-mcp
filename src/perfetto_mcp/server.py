@@ -7,6 +7,7 @@ from .connection_manager import ConnectionManager
 from .tools.trace_data import TraceDataTool
 from .tools.slice_info import SliceInfoTool
 from .tools.sql_query import SqlQueryTool
+from .tools.anr_detection import AnrDetectionTool
 from .resource import register_resources
 
 # Set up logging
@@ -30,6 +31,7 @@ def create_server() -> FastMCP:
     trace_data_tool = TraceDataTool(connection_manager)
     slice_info_tool = SliceInfoTool(connection_manager)
     sql_query_tool = SqlQueryTool(connection_manager)
+    anr_detection_tool = AnrDetectionTool(connection_manager)
     
     # Register tools with MCP server
     @mcp.tool()
@@ -170,6 +172,90 @@ def create_server() -> FastMCP:
         execute_sql_query("trace.pb", "SELECT * FROM process WHERE name LIKE '%chrome%'")
         """
         return sql_query_tool.execute_sql_query(trace_path, sql_query)
+    
+    @mcp.tool()
+    def detect_anrs(trace_path: str, process_name: str = None, min_duration_ms: int = 5000, time_range: dict = None) -> str:
+        """
+        Detect ANR (Application Not Responding) events in a Perfetto trace with contextual analysis.
+        
+        WHEN TO USE: Use this tool to identify ANR events in Android application traces. ANRs occur 
+        when the main thread is blocked for more than 5 seconds (by default), causing the system 
+        to show "App Not Responding" dialogs. This tool provides comprehensive analysis including 
+        main thread state, GC pressure, and severity assessment.
+        
+        WHAT YOU GET: Structured JSON output with detailed ANR information including timestamps, 
+        process details, main thread states, concurrent GC events, and severity analysis. Each 
+        ANR includes contextual data to help understand root causes.
+        
+        ANR ANALYSIS CONTEXT: ANRs are critical performance issues that directly impact user 
+        experience. They typically occur due to:
+        - Main thread blocking operations (I/O, network, database)
+        - Lock contention and synchronization issues
+        - Memory pressure causing excessive GC
+        - Binder transaction delays
+        - CPU-intensive operations on the main thread
+        
+        SEVERITY LEVELS: Results include severity analysis:
+        - CRITICAL: High GC pressure (>10 events) or system process ANRs
+        - HIGH: Main thread in disk/interruptible sleep or moderate GC pressure
+        - MEDIUM: Main thread running (CPU bound) or normal conditions
+        - LOW: Minimal impact ANRs
+
+        Parameters
+        ----------
+        trace_path : str
+            Path to Perfetto trace file (.pftrace, .pb, or other Perfetto formats). The trace 
+            must be from Android system tracing with ANR detection enabled. Typical sources 
+            include systrace, perfetto system traces, or custom Android instrumentation.
+        process_name : str, optional
+            Filter ANRs by process name. Supports glob patterns (*, ?, [abc]). Examples:
+            - "com.example.app" (exact match)
+            - "com.example.*" (all processes starting with com.example.)
+            - "*browser*" (any process containing 'browser')
+            If None, returns ANRs from all processes.
+        min_duration_ms : int, optional
+            Minimum ANR duration threshold in milliseconds. Default is 5000ms (5 seconds),
+            which is the standard Android ANR threshold. Lower values may include shorter
+            blocking events that don't trigger system ANR dialogs.
+        time_range : dict, optional
+            Filter ANRs by time range with keys:
+            - 'start_ms': Start time in milliseconds from trace beginning
+            - 'end_ms': End time in milliseconds from trace beginning
+            If None, analyzes the entire trace duration.
+
+        Returns
+        -------
+        str
+            JSON string containing:
+            - success: Boolean indicating if detection succeeded
+            - total_anr_count: Number of ANR events found
+            - anrs: Array of ANR objects with:
+              - process_name, pid, upid: Process identification
+              - timestamp_ms: ANR time in milliseconds from trace start
+              - subject: ANR description/subject line
+              - main_thread_state: State of main thread during ANR ('R'=Running, 'S'=Sleep, 'D'=Disk)
+              - gc_events_near_anr: Count of GC events within 5 seconds before ANR
+              - severity: Analysis-based severity level (CRITICAL/HIGH/MEDIUM/LOW)
+            - filters_applied: Summary of filtering criteria used
+            - error/message: Error details if detection fails
+
+        AI Agent Usage Notes
+        -------------------
+        - ANR data requires Android system traces with 'android.anrs' data source enabled
+        - Use this after get_trace_data() confirms the trace contains Android performance data
+        - High ANR counts indicate systemic performance issues requiring investigation
+        - Correlate ANR timestamps with other performance metrics (frame drops, memory pressure)
+        - For detailed root cause analysis, use execute_sql_query() with ANR timestamps
+        - Zero ANRs doesn't mean good performance - check trace coverage and data sources
+        
+        Common Follow-up Queries
+        -----------------------
+        - Thread state analysis around ANR timestamps
+        - Binder transaction analysis during ANR periods  
+        - Memory allocation patterns before ANRs
+        - CPU utilization and scheduling data during ANRs
+        """
+        return anr_detection_tool.detect_anrs(trace_path, process_name, min_duration_ms, time_range)
     
     # Setup cleanup using atexit - the simplest and most reliable approach
     atexit.register(connection_manager.cleanup)
