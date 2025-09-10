@@ -25,7 +25,6 @@ src/perfetto_mcp/
 ├── tools/
 │   ├── __init__.py
 │   ├── base.py              # Base tool class with connection management
-│   ├── trace_data.py        # get_trace_data tool
 │   ├── slice_info.py        # get_slice_info tool
 │   └── sql_query.py         # execute_sql_query tool
 └── utils/
@@ -41,13 +40,10 @@ src/perfetto_mcp/
 
 ## Available Tools
 
-### 1. `get_trace_data(trace_path)`
-Get basic trace statistics and sample slice data.
-
-### 2. `get_slice_info(trace_path, slice_name)`
+### 1. `get_slice_info(trace_path, slice_name)`
 Filter slices by name with counts and sample data.
 
-### 3. `execute_sql_query(trace_path, sql_query)`
+### 2. `execute_sql_query(trace_path, sql_query)`
 Execute arbitrary SQL queries against the trace database (limited to 50 rows for performance).
 
 ## MCP Resources

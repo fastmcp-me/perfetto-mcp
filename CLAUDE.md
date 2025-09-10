@@ -26,7 +26,6 @@ src/perfetto_mcp/
 ├── connection_manager.py    # Persistent connection management
 ├── tools/                   # Individual tool implementations
 │   ├── base.py              # Base tool class
-│   ├── trace_data.py        # get_trace_data tool
 │   ├── slice_info.py        # get_slice_info tool
 │   └── sql_query.py         # execute_sql_query tool
 └── utils/
@@ -39,9 +38,8 @@ src/perfetto_mcp/
 - `FastMCP Server` - Configured with proper lifecycle management and cleanup handlers
 
 **Available Tools:**
-1. `get_trace_data(trace_path)` - Basic trace statistics and sample slices
-2. `get_slice_info(trace_path, slice_name)` - Filter slices by name with counts and samples  
-3. `execute_sql_query(trace_path, sql_query)` - Execute arbitrary SQL queries (limited to 50 rows)
+1. `get_slice_info(trace_path, slice_name)` - Filter slices by name with counts and samples  
+2. `execute_sql_query(trace_path, sql_query)` - Execute arbitrary SQL queries (limited to 50 rows)
 
 **Connection Management Pattern:**
 - Tools use `ConnectionManager` to get persistent connections
