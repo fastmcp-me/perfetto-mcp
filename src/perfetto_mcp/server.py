@@ -35,42 +35,43 @@ def create_server() -> FastMCP:
     @mcp.tool()
     def get_slice_info(trace_path: str, slice_name: str, package_name: str | None = None) -> str:
         """
-        Filter and analyze all occurrences of a specific named event/operation in the trace.
-        
-        WHEN TO USE: Use this to analyze all instances of a specific operation by exact name. Perfect for understanding patterns like: How often does X function run? 
-        What's the timing distribution? Are there performance outliers?
-        
-        SEARCH BEHAVIOR: Performs EXACT case-sensitive string matching. "main" != "Main" != "MAIN". 
-        The slice_name must match exactly what appears in the trace data.
-        
-        ANALYSIS WORKFLOW:
-        1. Identify an interesting slice name from the trace  
-        2. Use this tool to get count + detailed samples of that specific slice
-        3. For complex analysis, use execute_sql_query() with WHERE name = 'slice_name'
+        Filter and summarize all occurrences of a specific slice (exact name).
+
+        WHEN TO USE: Quickly understand how often a slice appears, its timing
+        distribution at a glance, and see a few worst-case examples with context
+        (process/thread/track).
+
+        SEARCH BEHAVIOR: Performs EXACT case-sensitive string matching. "main" !=
+        "Main" != "MAIN". The `slice_name` must match exactly what appears in the
+        trace data.
+
+        OUTPUT FIELDS (result):
+        - sliceName: Input name
+        - totalCount: Total number of matching slices
+        - durationSummary: { minMs, avgMs, maxMs }
+        - timeBounds: { earliestTsMs, latestTsMs, spanMs }
+        - examples: Up to 50 longest instances with fields:
+          { sliceId, tsMs, endTsMs, durMs, depth, category, trackName,
+            process_name, pid, thread_name, tid, is_main_thread }
 
         Parameters
         ----------
         trace_path : str
             Path to the Perfetto trace file
         slice_name : str
-            EXACT name of slice to analyze. Must match case and spelling exactly as it appears in the trace. Common patterns: function names (e.g. "main", "malloc"), 
-            Android framework calls (e.g. "binder transaction"), GPU operations (e.g. "GPU Work"),
-            web browser events (e.g. "Layout", "Paint").
+            EXACT name of slice to analyze.
 
         Returns
         -------
         str
             JSON envelope with fields:
             - packageName, tracePath, success, error, result
-            - result: { sliceName, totalCount, sampleSlices: [{ ts, dur, name } ... up to 5] }
+            - result: see OUTPUT FIELDS above
 
-        AI Agent Usage Notes
-        -------------------
-        - Use slice names exactly as they appear in the trace
-        - Count tells you frequency (high count = hot path, low count = rare event)
-        - Compare durations across samples to spot performance issues
-        - If count is 0, the name doesn't exist - suggest similar names or SQL query
-        - For complex filtering (duration > X, specific time ranges), use execute_sql_query()
+        Notes
+        -----
+        - For complex filtering (duration > X, time ranges, process filters),
+          use execute_sql_query() with WHERE clauses.
         """
         return slice_info_tool.get_slice_info(trace_path, slice_name, package_name)
 
