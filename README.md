@@ -24,9 +24,10 @@ src/perfetto_mcp/
 │   └── trace_analysis.py    # trace analysis URL resource
 ├── tools/
 │   ├── __init__.py
-│   ├── base.py              # Base tool class with connection management
+│   ├── base.py              # Base tool class with connection management and unified formatting
 │   ├── slice_info.py        # get_slice_info tool
-│   └── sql_query.py         # execute_sql_query tool
+│   ├── sql_query.py         # execute_sql_query tool
+│   └── anr_detection.py     # detect_anrs tool
 └── utils/
     ├── __init__.py
     └── query_helpers.py     # SQL query utilities and validation
@@ -40,11 +41,14 @@ src/perfetto_mcp/
 
 ## Available Tools
 
-### 1. `get_slice_info(trace_path, slice_name)`
-Filter slices by name with counts and sample data.
+### 1. `get_slice_info(trace_path, slice_name, package_name=None)`
+Filter slices by name and return a structured JSON envelope with counts and sample data.
 
-### 2. `execute_sql_query(trace_path, sql_query)`
-Execute arbitrary SQL queries against the trace database (limited to 50 rows for performance).
+### 2. `execute_sql_query(trace_path, sql_query, package_name=None)`
+Execute arbitrary SELECT SQL queries against the trace database and return all rows.
+
+### 3. `detect_anrs(trace_path, process_name=None, min_duration_ms=5000, time_range=None, package_name=None)`
+Detect Application Not Responding (ANR) events in Android traces with contextual details and severity analysis.
 
 ## MCP Resources
 
@@ -94,8 +98,26 @@ The server maintains backward compatibility with the original error handling whi
 ## Safety Features
 
 - **SQL Validation**: Only SELECT queries are allowed for security
-- **Row Limiting**: All queries are automatically limited to 50 rows
 - **Query Sanitization**: Basic validation to prevent dangerous operations
+
+## Tool Output Schema
+
+All tool calls return a consistent JSON envelope:
+
+```
+{
+  "packageName": "not-specified" | "<provided by caller>",
+  "tracePath": "./trace.pftrace",
+  "success": true,
+  "error": null | { "code": "...", "message": "...", "details": "..." },
+  "result": { ... tool-specific payload ... }
+}
+```
+
+Examples:
+- get_slice_info → `result = { sliceName, totalCount, sampleSlices: [{ ts, dur, name }] }`
+- execute_sql_query → `result = { query, columns, rows, rowCount }`
+- detect_anrs → `result = { totalCount, anrs: [...], filters: { ... } }`
 
 ## Dependencies
 

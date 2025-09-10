@@ -30,12 +30,10 @@ def create_server() -> FastMCP:
     slice_info_tool = SliceInfoTool(connection_manager)
     sql_query_tool = SqlQueryTool(connection_manager)
     anr_detection_tool = AnrDetectionTool(connection_manager)
-    
-    # Register tools with MCP server
-    # Note: get_trace_data tool has been removed.
-    
+
+
     @mcp.tool()
-    def get_slice_info(trace_path: str, slice_name: str) -> str:
+    def get_slice_info(trace_path: str, slice_name: str, package_name: str | None = None) -> str:
         """
         Filter and analyze all occurrences of a specific named event/operation in the trace.
         
@@ -62,12 +60,9 @@ def create_server() -> FastMCP:
         Returns
         -------
         str
-            Human-readable analysis containing:
-            - Connection confirmation + search criteria
-            - Total count of matching slices (frequency analysis)
-            - 5 sample occurrences with timing data: ts, dur, name
-            - Zero results if slice name doesn't exist (check spelling/case)
-            - Error details if trace access fails
+            JSON envelope with fields:
+            - packageName, tracePath, success, error, result
+            - result: { sliceName, totalCount, sampleSlices: [{ ts, dur, name } ... up to 5] }
 
         AI Agent Usage Notes
         -------------------
@@ -77,17 +72,18 @@ def create_server() -> FastMCP:
         - If count is 0, the name doesn't exist - suggest similar names or SQL query
         - For complex filtering (duration > X, specific time ranges), use execute_sql_query()
         """
-        return slice_info_tool.get_slice_info(trace_path, slice_name)
-    
+        return slice_info_tool.get_slice_info(trace_path, slice_name, package_name)
+
+
     @mcp.tool()
-    def execute_sql_query(trace_path: str, sql_query: str) -> str:
+    def execute_sql_query(trace_path: str, sql_query: str, package_name: str | None = None) -> str:
         """
         Execute arbitrary SQL queries against a Perfetto trace database.
         
         This is the most powerful tool for trace analysis, allowing you to write custom
         SQL queries against the trace database. The Perfetto trace database contains
         multiple tables (slice, thread, process, counter, etc.) that you can query
-        using standard SQL syntax. Results are automatically limited to 50 rows for performance.
+        using standard SQL syntax. Results return all matching rows (no automatic LIMIT is applied).
 
         Parameters
         ----------
@@ -96,26 +92,19 @@ def create_server() -> FastMCP:
             The file must be a valid Perfetto trace that can be opened by TraceProcessor.
         sql_query : str
             SQL query to execute against the trace database. Only SELECT statements are
-            allowed for security reasons. The query will automatically have LIMIT 50
-            added if no LIMIT clause is present. Available tables include: slice, thread,
+            allowed for security reasons. Available tables include: slice, thread,
             process, counter, args, track, and many others.
 
         Returns
         -------
         str
-            JSON string containing:
-            - success: Boolean indicating if query executed successfully
-            - query: The actual SQL query that was executed (with any added LIMIT)
-            - columns: Array of column names in the result
-            - rows: Array of result rows as dictionaries
-            - row_count: Number of rows returned
-            - limited_to_50: Boolean indicating if results were truncated to 50 rows
-            - error/message: Error details if the query failed
+            JSON envelope with fields:
+            - packageName, tracePath, success, error, result
+            - result: { query, columns, rows, rowCount }
 
         Security Notes
         -------------
         - Only SELECT queries are permitted
-        - Results are automatically limited to 50 rows maximum
         - SQL injection protection through query validation
 
         Examples
@@ -125,10 +114,11 @@ def create_server() -> FastMCP:
         execute_sql_query("trace.pftrace", "SELECT DISTINCT name FROM thread")
         execute_sql_query("trace.pb", "SELECT * FROM process WHERE name LIKE '%chrome%'")
         """
-        return sql_query_tool.execute_sql_query(trace_path, sql_query)
-    
+        return sql_query_tool.execute_sql_query(trace_path, sql_query, package_name)
+
+
     @mcp.tool()
-    def detect_anrs(trace_path: str, process_name: str = None, min_duration_ms: int = 5000, time_range: dict = None) -> str:
+    def detect_anrs(trace_path: str, process_name: str | None = None, min_duration_ms: int = 5000, time_range: dict | None = None, package_name: str | None = None) -> str:
         """
         Detect ANR (Application Not Responding) events in a Perfetto trace with contextual analysis.
         
@@ -180,18 +170,13 @@ def create_server() -> FastMCP:
         Returns
         -------
         str
-            JSON string containing:
-            - success: Boolean indicating if detection succeeded
-            - total_anr_count: Number of ANR events found
-            - anrs: Array of ANR objects with:
-              - process_name, pid, upid: Process identification
-              - timestamp_ms: ANR time in milliseconds from trace start
-              - subject: ANR description/subject line
-              - main_thread_state: State of main thread during ANR ('R'=Running, 'S'=Sleep, 'D'=Disk)
-              - gc_events_near_anr: Count of GC events within 5 seconds before ANR
-              - severity: Analysis-based severity level (CRITICAL/HIGH/MEDIUM/LOW)
-            - filters_applied: Summary of filtering criteria used
-            - error/message: Error details if detection fails
+            JSON envelope with fields:
+            - packageName, tracePath, success, error, result
+            - result: {
+                totalCount,
+                anrs: [{ process_name, pid, upid, ts, timestampMs, subject, main_thread_state, gc_events_near_anr, severity }...],
+                filters: { process_name, min_duration_ms, time_range }
+              }
 
         AI Agent Usage Notes
         -------------------
@@ -209,9 +194,9 @@ def create_server() -> FastMCP:
         - Memory allocation patterns before ANRs
         - CPU utilization and scheduling data during ANRs
         """
-        return anr_detection_tool.detect_anrs(trace_path, process_name, min_duration_ms, time_range)
+        return anr_detection_tool.detect_anrs(trace_path, process_name, min_duration_ms, time_range, package_name)
     
-    # Setup cleanup using atexit - the simplest and most reliable approach
+    # Setup cleanup using atexit
     atexit.register(connection_manager.cleanup)
 
     # Register MCP resources in dedicated module
