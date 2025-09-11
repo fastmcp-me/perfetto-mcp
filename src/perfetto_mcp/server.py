@@ -9,6 +9,7 @@ from .tools.sql_query import SqlQueryTool
 from .tools.anr_detection import AnrDetectionTool
 from .resource import register_resources
 from .tools.anr_root_cause import AnrRootCauseTool
+from .tools.cpu_utilization import CpuUtilizationProfilerTool
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -32,6 +33,7 @@ def create_server() -> FastMCP:
     sql_query_tool = SqlQueryTool(connection_manager)
     anr_detection_tool = AnrDetectionTool(connection_manager)
     anr_root_cause_tool = AnrRootCauseTool(connection_manager)
+    cpu_util_tool = CpuUtilizationProfilerTool(connection_manager)
 
 
     @mcp.tool()
@@ -271,6 +273,54 @@ def create_server() -> FastMCP:
             deep_analysis,
         )
     
+    @mcp.tool()
+    def cpu_utilization_profiler(
+        trace_path: str,
+        process_name: str,
+        group_by: str = "thread",
+        include_frequency_analysis: bool = True,
+        package_name: str | None = None,
+    ) -> str:
+        """
+        Profile CPU utilization for a process with per-thread breakdown.
+
+        WHEN TO USE: Understand which threads consume CPU over the trace duration, how often they're
+        scheduled, and whether the main thread is CPU-bound. Optionally correlate with CPU frequency
+        (DVFS) when the trace contains frequency counters.
+
+        PARAMETERS
+        ----------
+        trace_path : str
+            Path to the Perfetto trace file.
+        process_name : str
+            Target process (supports GLOB patterns, e.g. "com.example.*").
+        group_by : str, optional
+            Currently only "thread" is supported. Default: "thread".
+        include_frequency_analysis : bool, optional
+            If true, includes avg CPU frequency (kHz) and per-CPU stats when available. Default: True.
+        package_name : str, optional
+            Metadata for the output envelope.
+
+        RETURNS
+        -------
+        str
+            JSON envelope with fields:
+            - packageName, tracePath, success, error, result
+            - result: {
+                processName, groupBy,
+                summary: { runtimeSecondsTotal, cpuPercentOfTrace, threadsCount },
+                threads: [ { threadName, isMainThread, runtimeSeconds, cpuPercent, cpusUsed, scheduleCount, avgSliceMs, maxSliceMs }... ],
+                frequency: { avgCpuFreqKHz, perCpu: [{ cpu, avgKHz, minKHz, maxKHz }] } | null
+              }
+        """
+        return cpu_util_tool.cpu_utilization_profiler(
+            trace_path,
+            process_name,
+            group_by,
+            include_frequency_analysis,
+            package_name,
+        )
+
     # Setup cleanup using atexit
     atexit.register(connection_manager.cleanup)
 

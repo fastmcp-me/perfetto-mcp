@@ -50,6 +50,9 @@ Execute arbitrary SELECT SQL queries against the trace database and return all r
 ### 3. `detect_anrs(trace_path, process_name=None, min_duration_ms=5000, time_range=None, package_name=None)`
 Detect Application Not Responding (ANR) events in Android traces with contextual details and severity analysis.
 
+### 4. `cpu_utilization_profiler(trace_path, process_name, group_by='thread', include_frequency_analysis=True, package_name=None)`
+Profile CPU utilization for a process with a per-thread breakdown (runtime, scheduling stats, CPU percent). Optionally includes CPU frequency (DVFS) summary when available.
+
 ## MCP Resources
 
 - `resource://perfetto-mcp/concepts`
