@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 class SliceInfoTool(BaseTool):
     """Tool for retrieving information about slices with a given name."""
 
-    def get_slice_info(self, trace_path: str, slice_name: str, package_name: Optional[str] = None) -> str:
+    def get_slice_info(self, trace_path: str, slice_name: str, process_name: Optional[str] = None) -> str:
         """Filter and summarize all occurrences of a slice by exact name.
 
         Returns a unified JSON envelope with:
@@ -137,4 +137,4 @@ class SliceInfoTool(BaseTool):
                 "examples": examples,
             }
 
-        return self.run_formatted(trace_path, package_name, _get_slice_info_operation)
+        return self.run_formatted(trace_path, process_name, _get_slice_info_operation)

@@ -12,13 +12,13 @@ logger = logging.getLogger(__name__)
 class SqlQueryTool(BaseTool):
     """Tool for executing arbitrary SQL queries on Perfetto traces."""
 
-    def execute_sql_query(self, trace_path: str, sql_query: str, package_name: Optional[str] = None) -> str:
+    def execute_sql_query(self, trace_path: str, sql_query: str, process_name: Optional[str] = None) -> str:
         """Execute a validated SELECT query and return a unified JSON envelope."""
         # Validate query for safety (only SELECT)
         if not validate_sql_query(sql_query):
             envelope = self._make_envelope(
                 trace_path=trace_path,
-                package_name=package_name,
+                process_name=process_name,
                 success=False,
                 error=self._error(
                     "INVALID_QUERY",
@@ -53,4 +53,4 @@ class SqlQueryTool(BaseTool):
             }
 
         # Use the unified formatter with connection management
-        return self.run_formatted(trace_path, package_name, _execute_sql_operation)
+        return self.run_formatted(trace_path, process_name, _execute_sql_operation)

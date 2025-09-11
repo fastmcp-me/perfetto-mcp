@@ -41,16 +41,16 @@ src/perfetto_mcp/
 
 ## Available Tools
 
-### 1. `get_slice_info(trace_path, slice_name, package_name=None)`
+### 1. `get_slice_info(trace_path, slice_name, process_name=None)`
 Filter slices by name and return a structured JSON envelope with counts and sample data.
 
-### 2. `execute_sql_query(trace_path, sql_query, package_name=None)`
+### 2. `execute_sql_query(trace_path, sql_query, process_name=None)`
 Execute arbitrary SELECT SQL queries against the trace database and return all rows.
 
-### 3. `detect_anrs(trace_path, process_name=None, min_duration_ms=5000, time_range=None, package_name=None)`
+### 3. `detect_anrs(trace_path, process_name=None, min_duration_ms=5000, time_range=None)`
 Detect Application Not Responding (ANR) events in Android traces with contextual details and severity analysis.
 
-### 4. `cpu_utilization_profiler(trace_path, process_name, group_by='thread', include_frequency_analysis=True, package_name=None)`
+### 4. `cpu_utilization_profiler(trace_path, process_name, group_by='thread', include_frequency_analysis=True)`
 Profile CPU utilization for a process with a per-thread breakdown (runtime, scheduling stats, CPU percent). Optionally includes CPU frequency (DVFS) summary when available.
 
 ## MCP Resources
@@ -109,7 +109,7 @@ All tool calls return a consistent JSON envelope:
 
 ```
 {
-  "packageName": "not-specified" | "<provided by caller>",
+  "processName": "not-specified" | "<provided by caller>",
   "tracePath": "./trace.pftrace",
   "success": true,
   "error": null | { "code": "...", "message": "...", "details": "..." },

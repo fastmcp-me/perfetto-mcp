@@ -37,7 +37,7 @@ def create_server() -> FastMCP:
 
 
     @mcp.tool()
-    def get_slice_info(trace_path: str, slice_name: str, package_name: str | None = None) -> str:
+    def get_slice_info(trace_path: str, slice_name: str, process_name: str | None = None) -> str:
         """
         Filter and summarize all occurrences of a specific slice (exact name).
 
@@ -69,7 +69,7 @@ def create_server() -> FastMCP:
         -------
         str
             JSON envelope with fields:
-            - packageName, tracePath, success, error, result
+            - processName, tracePath, success, error, result
             - result: see OUTPUT FIELDS above
 
         Notes
@@ -77,11 +77,11 @@ def create_server() -> FastMCP:
         - For complex filtering (duration > X, time ranges, process filters),
           use execute_sql_query() with WHERE clauses.
         """
-        return slice_info_tool.get_slice_info(trace_path, slice_name, package_name)
+        return slice_info_tool.get_slice_info(trace_path, slice_name, process_name)
 
 
     @mcp.tool()
-    def execute_sql_query(trace_path: str, sql_query: str, package_name: str | None = None) -> str:
+    def execute_sql_query(trace_path: str, sql_query: str, process_name: str | None = None) -> str:
         """
         Execute arbitrary SQL queries against a Perfetto trace database.
         
@@ -104,7 +104,7 @@ def create_server() -> FastMCP:
         -------
         str
             JSON envelope with fields:
-            - packageName, tracePath, success, error, result
+            - processName, tracePath, success, error, result
             - result: { query, columns, rows, rowCount }
 
         Security Notes
@@ -119,11 +119,11 @@ def create_server() -> FastMCP:
         execute_sql_query("trace.pftrace", "SELECT DISTINCT name FROM thread")
         execute_sql_query("trace.pb", "SELECT * FROM process WHERE name LIKE '%chrome%'")
         """
-        return sql_query_tool.execute_sql_query(trace_path, sql_query, package_name)
+        return sql_query_tool.execute_sql_query(trace_path, sql_query, process_name)
 
 
     @mcp.tool()
-    def detect_anrs(trace_path: str, process_name: str | None = None, min_duration_ms: int = 5000, time_range: dict | None = None, package_name: str | None = None) -> str:
+    def detect_anrs(trace_path: str, process_name: str | None = None, min_duration_ms: int = 5000, time_range: dict | None = None) -> str:
         """
         Detect ANR (Application Not Responding) events in a Perfetto trace with contextual analysis.
         
@@ -176,7 +176,7 @@ def create_server() -> FastMCP:
         -------
         str
             JSON envelope with fields:
-            - packageName, tracePath, success, error, result
+            - processName, tracePath, success, error, result
             - result: {
                 totalCount,
                 anrs: [{ process_name, pid, upid, ts, timestampMs, subject, main_thread_state, gc_events_near_anr, severity }...],
@@ -199,7 +199,7 @@ def create_server() -> FastMCP:
         - Memory allocation patterns before ANRs
         - CPU utilization and scheduling data during ANRs
         """
-        return anr_detection_tool.detect_anrs(trace_path, process_name, min_duration_ms, time_range, package_name)
+        return anr_detection_tool.detect_anrs(trace_path, process_name, min_duration_ms, time_range)
 
 
     @mcp.tool()
@@ -209,7 +209,6 @@ def create_server() -> FastMCP:
         anr_timestamp_ms: int | None = None,
         analysis_window_ms: int = 10_000,
         time_range: dict | None = None,
-        package_name: str | None = None,
         deep_analysis: bool = False,
     ) -> str:
         """
@@ -245,15 +244,13 @@ def create_server() -> FastMCP:
             Explicit time window: { 'start_ms': int, 'end_ms': int }. If provided together with
             anr_timestamp_ms, the timestamp must lie within the range; otherwise the tool returns an
             INVALID_PARAMETERS error asking for clarification.
-        package_name : str, optional
-            Metadata for the output envelope.
         deep_analysis : bool, optional
             If true, strengthens insights heuristics (e.g., prioritization notes when multiple causes exist).
 
         RETURNS
         -------
         str
-            JSON envelope { packageName, tracePath, success, error, result } where result contains:
+            JSON envelope { processName, tracePath, success, error, result } where result contains:
             - window: { startMs, endMs }
             - filters: { process_name }
             - mainThreadBlocks: [{ tsMs, durMs, state, ioWait, wakerUtid, wakerThreadName, wakerProcessName }]
@@ -269,7 +266,6 @@ def create_server() -> FastMCP:
             anr_timestamp_ms,
             analysis_window_ms,
             time_range,
-            package_name,
             deep_analysis,
         )
     
@@ -279,7 +275,6 @@ def create_server() -> FastMCP:
         process_name: str,
         group_by: str = "thread",
         include_frequency_analysis: bool = True,
-        package_name: str | None = None,
     ) -> str:
         """
         Profile CPU utilization for a process with per-thread breakdown.
@@ -298,14 +293,12 @@ def create_server() -> FastMCP:
             Currently only "thread" is supported. Default: "thread".
         include_frequency_analysis : bool, optional
             If true, includes avg CPU frequency (kHz) and per-CPU stats when available. Default: True.
-        package_name : str, optional
-            Metadata for the output envelope.
 
         RETURNS
         -------
         str
             JSON envelope with fields:
-            - packageName, tracePath, success, error, result
+            - processName, tracePath, success, error, result
             - result: {
                 processName, groupBy,
                 summary: { runtimeSecondsTotal, cpuPercentOfTrace, threadsCount },
@@ -318,7 +311,6 @@ def create_server() -> FastMCP:
             process_name,
             group_by,
             include_frequency_analysis,
-            package_name,
         )
 
     # Setup cleanup using atexit

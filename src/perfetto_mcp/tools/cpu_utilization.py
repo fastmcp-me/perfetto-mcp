@@ -23,7 +23,6 @@ class CpuUtilizationProfilerTool(BaseTool):
         process_name: str,
         group_by: str = "thread",
         include_frequency_analysis: bool = True,
-        package_name: Optional[str] = None,
     ) -> str:
         """Profile CPU utilization for a given process.
 
@@ -38,13 +37,11 @@ class CpuUtilizationProfilerTool(BaseTool):
         include_frequency_analysis : bool, optional
             When True, includes average CPU frequency summary (kHz) and per-CPU details
             if DVFS counters are available. Defaults to True.
-        package_name : str | None, optional
-            Package name for result envelope metadata.
 
         Returns
         -------
         str
-            JSON envelope with fields: packageName, tracePath, success, error, result
+            JSON envelope with fields: processName, tracePath, success, error, result
             Result shape:
               {
                 processName: str,
@@ -132,7 +129,7 @@ class CpuUtilizationProfilerTool(BaseTool):
                 "frequency": frequency,
             }
 
-        return self.run_formatted(trace_path, package_name, _op)
+        return self.run_formatted(trace_path, process_name, _op)
 
     # -------------------------------
     # Helpers
@@ -217,4 +214,3 @@ class CpuUtilizationProfilerTool(BaseTool):
             "avgCpuFreqKHz": avg_all,
             "perCpu": per_cpu,
         }
-

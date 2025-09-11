@@ -29,7 +29,6 @@ class AnrRootCauseTool(BaseTool):
         anr_timestamp_ms: Optional[int] = None,
         analysis_window_ms: int = 10_000,
         time_range: Optional[Dict[str, int]] = None,
-        package_name: Optional[str] = None,
         deep_analysis: bool = False,
     ) -> str:
         """Analyze likely ANR root causes for a process and time window.
@@ -46,15 +45,13 @@ class AnrRootCauseTool(BaseTool):
             Half-window size around anchor (default 10,000 ms). Used if `time_range` not provided.
         time_range : dict | None
             Explicit time range: { 'start_ms': int, 'end_ms': int }.
-        package_name : str | None
-            Package name for envelope metadata.
         deep_analysis : bool
             If True, strengthens heuristics and may compute additional notes.
 
         Returns
         -------
         str
-            JSON envelope with fields: packageName, tracePath, success, error, result
+            JSON envelope with fields: processName, tracePath, success, error, result
             result shape:
               {
                 window: { startMs, endMs },
@@ -108,7 +105,7 @@ class AnrRootCauseTool(BaseTool):
                 "notes": notes,
             }
 
-        return self.run_formatted(trace_path, package_name, _op)
+        return self.run_formatted(trace_path, process_name, _op)
 
     # -------------------------------
     # Window resolution and utilities
@@ -470,4 +467,3 @@ class AnrRootCauseTool(BaseTool):
             "rationale": rationale,
             "signalsUsed": signals_used,
         }
-

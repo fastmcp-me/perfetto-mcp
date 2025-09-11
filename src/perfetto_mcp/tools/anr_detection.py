@@ -18,7 +18,6 @@ class AnrDetectionTool(BaseTool):
         process_name: Optional[str] = None,
         min_duration_ms: int = 5000,
         time_range: Optional[Dict[str, int]] = None,
-        package_name: Optional[str] = None,
     ) -> str:
         """Detect ANR events and return a unified JSON envelope."""
 
@@ -110,7 +109,7 @@ class AnrDetectionTool(BaseTool):
                 },
             }
 
-        return self.run_formatted(trace_path, package_name, _execute_anr_detection)
+        return self.run_formatted(trace_path, process_name, _execute_anr_detection)
 
     def _analyze_anr_severity(self, anr_data: Dict[str, Any]) -> str:
         """

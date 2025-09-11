@@ -99,14 +99,14 @@ class BaseTool:
         self,
         *,
         trace_path: Optional[str],
-        package_name: Optional[str],
+        process_name: Optional[str],
         success: bool,
         result: Optional[Dict[str, Any]] = None,
         error: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """Create the standard response envelope."""
         return {
-            "packageName": package_name or "not-specified",
+            "processName": process_name or "not-specified",
             "tracePath": trace_path,
             "success": success,
             "error": error,
@@ -123,7 +123,7 @@ class BaseTool:
     def run_formatted(
         self,
         trace_path: str,
-        package_name: Optional[str],
+        process_name: Optional[str],
         op: Callable[[Any], Dict[str, Any]],  # (tp) -> Dict[str, Any] (result payload)
     ) -> str:
         """Run an operation with connection management and return a JSON envelope string."""
@@ -132,7 +132,7 @@ class BaseTool:
                 result = op(tp)
                 return self._make_envelope(
                     trace_path=trace_path,
-                    package_name=package_name,
+                    process_name=process_name,
                     success=True,
                     result=result,
                 )
@@ -141,28 +141,28 @@ class BaseTool:
         except ToolError as te:
             envelope = self._make_envelope(
                 trace_path=trace_path,
-                package_name=package_name,
+                process_name=process_name,
                 success=False,
                 error=self._error(te.code, te.message, te.details),
             )
         except FileNotFoundError as fnf:
             envelope = self._make_envelope(
                 trace_path=trace_path,
-                package_name=package_name,
+                process_name=process_name,
                 success=False,
                 error=self._error("FILE_NOT_FOUND", "Trace file not found", str(fnf)),
             )
         except ConnectionError as ce:
             envelope = self._make_envelope(
                 trace_path=trace_path,
-                package_name=package_name,
+                process_name=process_name,
                 success=False,
                 error=self._error("CONNECTION_FAILED", "Could not connect to trace processor", str(ce)),
             )
         except Exception as e:
             envelope = self._make_envelope(
                 trace_path=trace_path,
-                package_name=package_name,
+                process_name=process_name,
                 success=False,
                 error=self._error("INTERNAL_ERROR", str(e)),
             )
