@@ -8,6 +8,7 @@ from .tools.slice_info import SliceInfoTool
 from .tools.sql_query import SqlQueryTool
 from .tools.anr_detection import AnrDetectionTool
 from .resource import register_resources
+from .tools.anr_root_cause import AnrRootCauseTool
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -30,6 +31,7 @@ def create_server() -> FastMCP:
     slice_info_tool = SliceInfoTool(connection_manager)
     sql_query_tool = SqlQueryTool(connection_manager)
     anr_detection_tool = AnrDetectionTool(connection_manager)
+    anr_root_cause_tool = AnrRootCauseTool(connection_manager)
 
 
     @mcp.tool()
@@ -196,6 +198,78 @@ def create_server() -> FastMCP:
         - CPU utilization and scheduling data during ANRs
         """
         return anr_detection_tool.detect_anrs(trace_path, process_name, min_duration_ms, time_range, package_name)
+
+
+    @mcp.tool()
+    def anr_root_cause_analyzer(
+        trace_path: str,
+        process_name: str | None = None,
+        anr_timestamp_ms: int | None = None,
+        analysis_window_ms: int = 10_000,
+        time_range: dict | None = None,
+        package_name: str | None = None,
+        deep_analysis: bool = False,
+    ) -> str:
+        """
+        Analyze likely ANR root causes by correlating multiple signals within a time window.
+
+        WHEN TO USE: After detecting an ANR timestamp (via detect_anrs or otherwise), run this tool
+        for the affected process to quickly surface likely causes such as slow Binder calls, main
+        thread IO/sleep, Java monitor contention, and memory pressure.
+
+        SIGNALS AT A GLANCE
+        - Main thread blocking: Long non-running states on the app's main thread (e.g., IO wait or
+          sleeping) that directly prevent UI event handling and can trigger ANRs.
+        - Binder delays: Slow outbound Binder calls from the app (often the main thread) indicating
+          the app is waiting on a remote service/System Server; common in input/provider ANRs.
+        - Memory pressure: Low or rapidly dropping MemAvailable around the window suggesting GC/LMK
+          pressure contributing to long stalls and poor responsiveness.
+        - Java monitor contention: Long waits on synchronized monitors on the main thread showing
+          which thread/method is blocking; indicates lock contention or potential deadlocks.
+
+        PARAMETERS
+        ----------
+        trace_path : str
+            Path to the Perfetto trace file.
+        process_name : str, optional
+            Filter by process name (supports GLOB). Example: "com.example.*". If omitted, runs without
+            process filter where possible, but some signals (monitor contention) require a process.
+        anr_timestamp_ms : int, optional
+            Anchor timestamp in milliseconds from trace start. Used to build a symmetric window when
+            time_range is not provided.
+        analysis_window_ms : int, optional
+            Half-window around the anchor timestamp. Default 10,000 (±10s).
+        time_range : dict, optional
+            Explicit time window: { 'start_ms': int, 'end_ms': int }. If provided together with
+            anr_timestamp_ms, the timestamp must lie within the range; otherwise the tool returns an
+            INVALID_PARAMETERS error asking for clarification.
+        package_name : str, optional
+            Metadata for the output envelope.
+        deep_analysis : bool, optional
+            If true, strengthens insights heuristics (e.g., prioritization notes when multiple causes exist).
+
+        RETURNS
+        -------
+        str
+            JSON envelope { packageName, tracePath, success, error, result } where result contains:
+            - window: { startMs, endMs }
+            - filters: { process_name }
+            - mainThreadBlocks: [{ tsMs, durMs, state, ioWait, wakerUtid, wakerThreadName, wakerProcessName }]
+            - binderDelays: [{ binderTxnId, clientTsMs, clientDurMs, serverProcess, aidlName, methodName, clientMainThread }]
+            - memoryPressure: { start: { tsMs, availableMemoryMb }, end: { ... }, deltaMb }
+            - lockContention: [{ blockedThreadName, blockingThreadName, blockedMethod, shortBlockingMethod, blockingSrc, waiterCount, blockedThreadWaiterCount, durMs, tsMs }]
+            - insights: { likelyCauses, rationale, signalsUsed }
+            - notes: [ ... ]
+        """
+        return anr_root_cause_tool.anr_root_cause_analyzer(
+            trace_path,
+            process_name,
+            anr_timestamp_ms,
+            analysis_window_ms,
+            time_range,
+            package_name,
+            deep_analysis,
+        )
     
     # Setup cleanup using atexit
     atexit.register(connection_manager.cleanup)
