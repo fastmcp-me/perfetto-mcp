@@ -30,7 +30,8 @@ src/perfetto_mcp/
 │   ├── anr_detection.py     # detect_anrs tool
 │   ├── anr_root_cause.py    # anr_root_cause_analyzer tool
 │   ├── cpu_utilization.py   # cpu_utilization_profiler tool
-│   └── jank_frames.py       # detect_jank_frames tool
+│   ├── jank_frames.py       # detect_jank_frames tool
+│   └── frame_performance_summary.py  # frame_performance_summary tool
 └── utils/
     ├── __init__.py
     └── query_helpers.py     # SQL query utilities and validation
@@ -67,6 +68,11 @@ Returns a JSON envelope with `result = { totalCount, frames: [...], filters }` w
 Notes for `detect_jank_frames`:
 - Requires Android frame timeline data. The tool first uses standard library modules (`android.frames.timeline`, `android.frames.per_frame_metrics`).
 - If those are missing, it falls back to raw `actual_frame_timeline_slice`/`expected_frame_timeline_slice` tables and computes `overrun_ms` without CPU/UI time (returned as null) to remain useful on leaner traces.
+
+### 7. `frame_performance_summary(trace_path, process_name)`
+Aggregated frame performance metrics and jank statistics for a process.
+Returns a JSON envelope with `result = { total_frames, jank_frames, jank_rate_percent, slow_frames, big_jank_frames, huge_jank_frames, avg_cpu_time_ms, max_cpu_time_ms, p95_cpu_time_ms, p99_cpu_time_ms, performance_rating }`.
+Requires per-frame metrics; if unavailable, returns a `FRAME_METRICS_UNAVAILABLE` error with details.
 
 ## MCP Resources
 

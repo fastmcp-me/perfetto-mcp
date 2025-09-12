@@ -11,6 +11,7 @@ from .resource import register_resources
 from .tools.anr_root_cause import AnrRootCauseTool
 from .tools.cpu_utilization import CpuUtilizationProfilerTool
 from .tools.jank_frames import JankFramesTool
+from .tools.frame_performance_summary import FramePerformanceSummaryTool
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -36,6 +37,7 @@ def create_server() -> FastMCP:
     anr_root_cause_tool = AnrRootCauseTool(connection_manager)
     cpu_util_tool = CpuUtilizationProfilerTool(connection_manager)
     jank_frames_tool = JankFramesTool(connection_manager)
+    frame_summary_tool = FramePerformanceSummaryTool(connection_manager)
 
 
     @mcp.tool()
@@ -359,6 +361,35 @@ def create_server() -> FastMCP:
             jank_threshold_ms,
             severity_filter,
         )
+
+    @mcp.tool()
+    def frame_performance_summary(trace_path: str, process_name: str) -> str:
+        """
+        Summarize frame performance with jank and CPU stats.
+
+        WHEN TO USE: High-level overview of a process's frame stability and
+        rendering cost. Produces jank counts/rate and CPU time distribution.
+
+        Parameters
+        ----------
+        trace_path : str
+            Path to the Perfetto trace file.
+        process_name : str
+            Exact process name to analyze.
+
+        Returns
+        -------
+        str
+            JSON envelope with fields:
+            - processName, tracePath, success, error, result
+            - result: {
+                total_frames, jank_frames, jank_rate_percent,
+                slow_frames, big_jank_frames, huge_jank_frames,
+                avg_cpu_time_ms, max_cpu_time_ms, p95_cpu_time_ms, p99_cpu_time_ms,
+                performance_rating
+              }
+        """
+        return frame_summary_tool.frame_performance_summary(trace_path, process_name)
 
     # Setup cleanup using atexit
     atexit.register(connection_manager.cleanup)
