@@ -79,6 +79,11 @@ Detects memory leaks using process RSS growth patterns and heap graph aggregatio
 Returns a JSON envelope with `result = { growth: { avgGrowthRateMbPerMin, maxGrowthRateMbPerMin, sampleCount, leakIndicatorCount }, suspiciousClasses: [{ type_name, obj_count, size_mb, dominated_obj_count, dominated_size_mb }], filters, notes }`.
 If RSS or heap graph data are unavailable, returns partial results with `notes` explaining what’s missing.
 
+### 9. `heap_dominator_tree_analyzer(trace_path, process_name, max_classes=20)`
+Analyzes the latest heap graph snapshot for a process to surface classes dominating heap usage.
+Returns a JSON envelope with `result = { totalCount, classes: [{ display_name, instance_count, self_size_mb, native_size_mb, total_size_mb, avg_reachability, min_root_distance, memory_impact }], filters, notes }`.
+If extended heap graph columns or modules are missing, falls back to a simplified query (without `native_size_mb`, `avg_reachability`, `min_root_distance`) and adds a `notes` entry. If no heap graph exists in the trace, returns `HEAP_GRAPH_UNAVAILABLE`.
+
 ## MCP Resources
 
 - `resource://perfetto-mcp/concepts`

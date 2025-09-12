@@ -13,6 +13,7 @@ from .tools.cpu_utilization import CpuUtilizationProfilerTool
 from .tools.jank_frames import JankFramesTool
 from .tools.frame_performance_summary import FramePerformanceSummaryTool
 from .tools.memory_leak_detector import MemoryLeakDetectorTool
+from .tools.heap_dominator_tree_analyzer import HeapDominatorTreeAnalyzerTool
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -40,6 +41,7 @@ def create_server() -> FastMCP:
     jank_frames_tool = JankFramesTool(connection_manager)
     frame_summary_tool = FramePerformanceSummaryTool(connection_manager)
     memory_leak_tool = MemoryLeakDetectorTool(connection_manager)
+    heap_dom_tool = HeapDominatorTreeAnalyzerTool(connection_manager)
 
 
     @mcp.tool()
@@ -441,6 +443,51 @@ def create_server() -> FastMCP:
             growth_threshold_mb_per_min,
             analysis_duration_ms,
         )
+
+    @mcp.tool()
+    def heap_dominator_tree_analyzer(
+        trace_path: str,
+        process_name: str,
+        max_classes: int = 20,
+    ) -> str:
+        """
+        Analyze the heap dominator tree to identify memory-hogging classes.
+
+        WHEN TO USE: Understand which classes dominate heap usage in the latest
+        heap graph snapshot for a process. Helps pinpoint memory bloat and
+        potential leak suspects.
+
+        Parameters
+        ----------
+        trace_path : str
+            Path to the Perfetto trace file.
+        process_name : str
+            Exact process name to analyze (matches trace data).
+        max_classes : int, optional
+            Maximum number of classes to return (1–50). Default: 20.
+
+        Returns
+        -------
+        str
+            JSON envelope with fields:
+            - processName, tracePath, success, error, result
+            - result: {
+                totalCount,
+                classes: [{ display_name, instance_count, self_size_mb, native_size_mb,
+                            total_size_mb, avg_reachability, min_root_distance, memory_impact }...],
+                filters: { process_name, max_classes },
+                notes: []
+              }
+
+        Notes
+        -----
+        - Uses heap graph tables (heap_graph_object/class). If extended columns
+          from the dominator_tree module are unavailable, the tool falls back to
+          a simplified query (without native_size/reachability/root_distance)
+          and adds a note. If no heap graph exists in the trace, returns a
+          HEAP_GRAPH_UNAVAILABLE error.
+        """
+        return heap_dom_tool.heap_dominator_tree_analyzer(trace_path, process_name, max_classes)
 
     # Setup cleanup using atexit
     atexit.register(connection_manager.cleanup)

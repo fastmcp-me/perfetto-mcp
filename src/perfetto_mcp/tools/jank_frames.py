@@ -14,7 +14,6 @@ logger = logging.getLogger(__name__)
 class JankFramesTool(BaseTool):
     """Tool for detecting janky frames with classification and context.
 
-    Implements the `detect_jank_frames` SQL query from `.cursor/perfetto-sql-queries.md`.
     Joins Android frame timeline and per-frame metrics to provide severity and
     source classification (Application vs SurfaceFlinger), along with CPU/UI time.
     """

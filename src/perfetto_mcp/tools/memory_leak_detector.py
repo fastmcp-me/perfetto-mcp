@@ -13,8 +13,6 @@ logger = logging.getLogger(__name__)
 class MemoryLeakDetectorTool(BaseTool):
     """Detect memory leak patterns via heap growth rate and suspicious classes.
 
-    Implements the `memory_leak_detector` SQL from `.cursor/perfetto-sql-queries.md`.
-
     Produces two sections:
     - growth: Average/max growth rate (MB/min) and leak indicator count
     - suspiciousClasses: Top classes by dominated heap size from heap graph aggregation
