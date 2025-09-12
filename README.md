@@ -74,6 +74,11 @@ Aggregated frame performance metrics and jank statistics for a process.
 Returns a JSON envelope with `result = { total_frames, jank_frames, jank_rate_percent, slow_frames, big_jank_frames, huge_jank_frames, avg_cpu_time_ms, max_cpu_time_ms, p95_cpu_time_ms, p99_cpu_time_ms, performance_rating }`.
 Requires per-frame metrics; if unavailable, returns a `FRAME_METRICS_UNAVAILABLE` error with details.
 
+### 8. `memory_leak_detector(trace_path, process_name, growth_threshold_mb_per_min=5.0, analysis_duration_ms=60000)`
+Detects memory leaks using process RSS growth patterns and heap graph aggregation.
+Returns a JSON envelope with `result = { growth: { avgGrowthRateMbPerMin, maxGrowthRateMbPerMin, sampleCount, leakIndicatorCount }, suspiciousClasses: [{ type_name, obj_count, size_mb, dominated_obj_count, dominated_size_mb }], filters, notes }`.
+If RSS or heap graph data are unavailable, returns partial results with `notes` explaining what’s missing.
+
 ## MCP Resources
 
 - `resource://perfetto-mcp/concepts`

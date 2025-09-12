@@ -12,6 +12,7 @@ from .tools.anr_root_cause import AnrRootCauseTool
 from .tools.cpu_utilization import CpuUtilizationProfilerTool
 from .tools.jank_frames import JankFramesTool
 from .tools.frame_performance_summary import FramePerformanceSummaryTool
+from .tools.memory_leak_detector import MemoryLeakDetectorTool
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -38,6 +39,7 @@ def create_server() -> FastMCP:
     cpu_util_tool = CpuUtilizationProfilerTool(connection_manager)
     jank_frames_tool = JankFramesTool(connection_manager)
     frame_summary_tool = FramePerformanceSummaryTool(connection_manager)
+    memory_leak_tool = MemoryLeakDetectorTool(connection_manager)
 
 
     @mcp.tool()
@@ -390,6 +392,55 @@ def create_server() -> FastMCP:
               }
         """
         return frame_summary_tool.frame_performance_summary(trace_path, process_name)
+
+    @mcp.tool()
+    def memory_leak_detector(
+        trace_path: str,
+        process_name: str,
+        growth_threshold_mb_per_min: float = 5.0,
+        analysis_duration_ms: int = 60_000,
+    ) -> str:
+        """
+        Detect memory leaks through heap growth pattern analysis and heap graph.
+
+        WHEN TO USE: Identify potential memory leaks indicated by sustained RSS growth
+        and large retained heap sizes for specific classes.
+
+        Parameters
+        ----------
+        trace_path : str
+            Path to the Perfetto trace file.
+        process_name : str
+            Exact process name to analyze.
+        growth_threshold_mb_per_min : float, optional
+            Threshold for growth rate (MB/min) to flag potential leaks. Default: 5.0.
+        analysis_duration_ms : int, optional
+            Analyze the first N milliseconds from trace start. Default: 60,000 ms.
+
+        Returns
+        -------
+        str
+            JSON envelope with fields:
+            - processName, tracePath, success, error, result
+            - result: {
+                growth: { avgGrowthRateMbPerMin, maxGrowthRateMbPerMin, sampleCount, leakIndicatorCount },
+                suspiciousClasses: [{ type_name, obj_count, size_mb, dominated_obj_count, dominated_size_mb }],
+                filters: { process_name, growth_threshold_mb_per_min, analysis_duration_ms },
+                notes: []
+              }
+
+        Notes
+        -----
+        - Growth analysis uses process RSS samples (process_counter_track 'mem.rss').
+        - Suspicious classes require heap graph data (android.memory.heap_graph.class_aggregation).
+        - If a dataset is unavailable, the tool returns partial results and notes.
+        """
+        return memory_leak_tool.memory_leak_detector(
+            trace_path,
+            process_name,
+            growth_threshold_mb_per_min,
+            analysis_duration_ms,
+        )
 
     # Setup cleanup using atexit
     atexit.register(connection_manager.cleanup)
