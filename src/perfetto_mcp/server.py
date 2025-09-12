@@ -10,6 +10,7 @@ from .tools.anr_detection import AnrDetectionTool
 from .resource import register_resources
 from .tools.anr_root_cause import AnrRootCauseTool
 from .tools.cpu_utilization import CpuUtilizationProfilerTool
+from .tools.jank_frames import JankFramesTool
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -34,6 +35,7 @@ def create_server() -> FastMCP:
     anr_detection_tool = AnrDetectionTool(connection_manager)
     anr_root_cause_tool = AnrRootCauseTool(connection_manager)
     cpu_util_tool = CpuUtilizationProfilerTool(connection_manager)
+    jank_frames_tool = JankFramesTool(connection_manager)
 
 
     @mcp.tool()
@@ -311,6 +313,51 @@ def create_server() -> FastMCP:
             process_name,
             group_by,
             include_frequency_analysis,
+        )
+
+    @mcp.tool()
+    def detect_jank_frames(
+        trace_path: str,
+        process_name: str,
+        jank_threshold_ms: float = 16.67,
+        severity_filter: list[str] | None = None,
+    ) -> str:
+        """
+        Detect janky frames with severity and source classification.
+
+        WHEN TO USE: Investigate UI performance issues for a specific process.
+        Identifies jank type, severity, overrun, CPU/UI time, and whether the
+        jank originated in the app vs SurfaceFlinger.
+
+        Parameters
+        ----------
+        trace_path : str
+            Path to the Perfetto trace file.
+        process_name : str
+            Exact process name to analyze (as stored in the trace).
+        jank_threshold_ms : float, optional
+            Frame duration threshold (ms) to consider a frame janky. Default: 16.67.
+        severity_filter : list[str] | None, optional
+            Filter by jank severity types (e.g. ["severe", "moderate"]).
+
+        Returns
+        -------
+        str
+            JSON envelope with fields:
+            - processName, tracePath, success, error, result
+            - result: {
+                totalCount,
+                frames: [{ frame_id, timestamp_ms, duration_ms, overrun_ms, jank_type,
+                           jank_severity_type, jank_source, cpu_time_ms, ui_time_ms,
+                           layer_name, jank_classification }...],
+                filters: { process_name, jank_threshold_ms, severity_filter }
+              }
+        """
+        return jank_frames_tool.detect_jank_frames(
+            trace_path,
+            process_name,
+            jank_threshold_ms,
+            severity_filter,
         )
 
     # Setup cleanup using atexit

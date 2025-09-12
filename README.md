@@ -53,6 +53,11 @@ Detect Application Not Responding (ANR) events in Android traces with contextual
 ### 4. `cpu_utilization_profiler(trace_path, process_name, group_by='thread', include_frequency_analysis=True)`
 Profile CPU utilization for a process with a per-thread breakdown (runtime, scheduling stats, CPU percent). Optionally includes CPU frequency (DVFS) summary when available.
 
+### 5. `detect_jank_frames(trace_path, process_name, jank_threshold_ms=16.67, severity_filter=None)`
+Identify janky frames for a process with severity and source classification (Application vs SurfaceFlinger), including overrun, CPU/UI time, and layer name.
+Returns a JSON envelope with `result = { totalCount, frames: [...], filters }` where each frame row contains:
+`{ frame_id, timestamp_ms, duration_ms, overrun_ms, jank_type, jank_severity_type, jank_source, cpu_time_ms, ui_time_ms, layer_name, jank_classification }`.
+
 ## MCP Resources
 
 - `resource://perfetto-mcp/concepts`
