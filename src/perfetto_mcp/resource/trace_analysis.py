@@ -47,8 +47,9 @@ When using this MCP server's tools, the official documentation provides essentia
 2. **Trace Processor**: The engine behind all MCP tools in this server
  - https://perfetto.dev/docs/analysis/trace-processor-python
 3. **Analysis Workflow**: How to progress from basic to advanced analysis
-4. **Standard Library**: Pre-built functions available in queries
+4. **Standard Library**: Pre-built functions available in queries. For better sql analysis, use standard library tables and aggregated results rather than querying and processing direct sql results.
  - https://perfetto.dev/docs/analysis/stdlib-docs
+ - https://perfetto.dev/docs/analysis/stdlib-docs#package-prelude
 
 ## Recommended Reading Order
 
