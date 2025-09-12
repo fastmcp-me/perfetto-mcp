@@ -27,7 +27,10 @@ src/perfetto_mcp/
 │   ├── base.py              # Base tool class with connection management and unified formatting
 │   ├── slice_info.py        # get_slice_info tool
 │   ├── sql_query.py         # execute_sql_query tool
-│   └── anr_detection.py     # detect_anrs tool
+│   ├── anr_detection.py     # detect_anrs tool
+│   ├── anr_root_cause.py    # anr_root_cause_analyzer tool
+│   ├── cpu_utilization.py   # cpu_utilization_profiler tool
+│   └── jank_frames.py       # detect_jank_frames tool
 └── utils/
     ├── __init__.py
     └── query_helpers.py     # SQL query utilities and validation
@@ -50,13 +53,20 @@ Execute arbitrary SELECT SQL queries against the trace database and return all r
 ### 3. `detect_anrs(trace_path, process_name=None, min_duration_ms=5000, time_range=None)`
 Detect Application Not Responding (ANR) events in Android traces with contextual details and severity analysis.
 
-### 4. `cpu_utilization_profiler(trace_path, process_name, group_by='thread', include_frequency_analysis=True)`
+### 4. `anr_root_cause_analyzer(trace_path, process_name=None, anr_timestamp_ms=None, analysis_window_ms=10000, time_range=None, deep_analysis=False)`
+Analyze likely ANR root causes by correlating multiple signals within a time window (main thread blocking, slow Binder transactions, memory pressure, Java monitor contention). Returns a structured envelope with an insights section and per-signal details.
+
+### 5. `cpu_utilization_profiler(trace_path, process_name, group_by='thread', include_frequency_analysis=True)`
 Profile CPU utilization for a process with a per-thread breakdown (runtime, scheduling stats, CPU percent). Optionally includes CPU frequency (DVFS) summary when available.
 
-### 5. `detect_jank_frames(trace_path, process_name, jank_threshold_ms=16.67, severity_filter=None)`
+### 6. `detect_jank_frames(trace_path, process_name, jank_threshold_ms=16.67, severity_filter=None)`
 Identify janky frames for a process with severity and source classification (Application vs SurfaceFlinger), including overrun, CPU/UI time, and layer name.
 Returns a JSON envelope with `result = { totalCount, frames: [...], filters }` where each frame row contains:
 `{ frame_id, timestamp_ms, duration_ms, overrun_ms, jank_type, jank_severity_type, jank_source, cpu_time_ms, ui_time_ms, layer_name, jank_classification }`.
+
+Notes for `detect_jank_frames`:
+- Requires Android frame timeline data. The tool first uses standard library modules (`android.frames.timeline`, `android.frames.per_frame_metrics`).
+- If those are missing, it falls back to raw `actual_frame_timeline_slice`/`expected_frame_timeline_slice` tables and computes `overrun_ms` without CPU/UI time (returned as null) to remain useful on leaner traces.
 
 ## MCP Resources
 
@@ -126,6 +136,9 @@ Examples:
 - get_slice_info → `result = { sliceName, totalCount, sampleSlices: [{ ts, dur, name }] }`
 - execute_sql_query → `result = { query, columns, rows, rowCount }`
 - detect_anrs → `result = { totalCount, anrs: [...], filters: { ... } }`
+- anr_root_cause_analyzer → `result = { window, filters, mainThreadBlocks, binderDelays, memoryPressure, lockContention, insights, notes }`
+- cpu_utilization_profiler → `result = { processName, groupBy, summary, threads, frequency }`
+- detect_jank_frames → `result = { totalCount, frames: [...], filters }`
 
 ## Dependencies
 
@@ -138,6 +151,29 @@ The server implements multiple cleanup strategies:
 - Primary: `atexit` handlers for normal shutdown
 - Secondary: Signal handlers for SIGTERM/SIGINT
 - Graceful: Proper connection cleanup in all scenarios
+
+
+## Usage Examples
+
+Run the server (stdio):
+- `uv run mcp dev main.py` (with dev tooling), or
+- `uv run python main.py`
+
+Example tool calls (high level):
+- `get_slice_info`: Provide `trace_path` and exact `slice_name` to summarize occurrences and show worst-duration examples.
+- `execute_sql_query`: Provide a SELECT query. Dangerous statements are rejected.
+- `detect_anrs`: Optionally filter by `process_name`, `min_duration_ms`, and a `{start_ms, end_ms}` window.
+- `anr_root_cause_analyzer`: Provide the process and either an `anr_timestamp_ms` with an `analysis_window_ms` or an explicit `time_range`.
+- `cpu_utilization_profiler`: Provide `process_name`; returns per-thread CPU usage breakdown. Optionally includes frequency analysis.
+- `detect_jank_frames`: Provide `process_name`; optionally tune `jank_threshold_ms` and `severity_filter`.
+
+## Data Prerequisites & Troubleshooting
+
+- `detect_anrs`/`anr_root_cause_analyzer`: Require Android system traces with ANR data. If the ANR module/tables are absent, the tool returns an informative error.
+- `detect_jank_frames`: Requires Android frame timeline data (Android S+). If standard library views are missing, the tool falls back to raw frame tables. If even those are absent, you likely didn’t enable frame timeline in the trace config.
+- `cpu_utilization_profiler`: Requires scheduler data (ftrace sched events) to compute per-thread runtime and scheduling stats.
+
+If you see a `*_DATA_UNAVAILABLE` error, re-capture with the relevant data sources enabled or provide a different trace.
 
 
 ## Reference Documents
