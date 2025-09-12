@@ -219,7 +219,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "mcp", extras = ["cli"], specifier = ">=1.12.1" },
-    { name = "perfetto", specifier = ">=0.13.1" },
+    { name = "perfetto", specifier = ">=0.14.0" },
     { name = "protobuf", specifier = "<5" },
 ]
 

@@ -6,6 +6,6 @@ readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
     "mcp[cli]>=1.12.1",
-    "perfetto>=0.13.1",
+    "perfetto>=0.14.0",
     "protobuf<5",
 ]
