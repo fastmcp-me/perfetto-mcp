@@ -102,6 +102,9 @@ FROM slice WHERE name LIKE 'GC_%';
 - Frame >32ms = multiple dropped frames
 - Irregular frame intervals = pipeline problems
 - Check: Choreographer#doFrame duration, VSYNC-app vs VSYNC-sf alignment
+- App Jank Types: Key app-related janks include "AppDeadlineMissed" (app took longer than expected) and "BufferStuffing" (app sends frames faster than they can be presented, creating a queue backlog that increases input latency).
+- SurfaceFlinger Jank Categories: System-level janks include "SurfaceFlingerCpuDeadlineMissed" (main thread overrun), "SurfaceFlingerGpuDeadlineMissed" (GPU composition delays), "DisplayHAL" (hardware abstraction layer delays), and "PredictionError" (scheduler timing drift).
+- SQL Data Access: Frame data is accessible through SQL queries via two main tables (`expected_frame_timeline_slice` and `actual_frame_timeline_slice`) that provide detailed timing, token information, jank types, and process details for comprehensive performance analysis.
 
 **Memory Pressure Indicators**:
 - **App level**: GC frequency >1/sec, GC duration >10ms, heap growth approaching limit
@@ -278,7 +281,7 @@ FROM slice WHERE name LIKE 'GC_%';
 **Key Principles**:
 - Never analyze single track in isolation - correlate across layers
 - Distinguish symptoms from root causes - visible problems have hidden origins
-- Use SQL for quantitative analysis vs visual inspection alone
+- Use SQL for quantitative analysis
 - Consider device state and environmental factors
 - Focus on critical path - what's actually blocking user experience
 

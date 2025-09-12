@@ -28,15 +28,6 @@ This resource points to the official Perfetto documentation for trace analysis.
 
 **Official Documentation URL:** https://perfetto.dev/docs/analysis/getting-started
 
-## Quick Summary
-
-The official guide covers:
-
-- **The Challenge**: Making sense of raw trace data
-- **The Solution**: Trace Processor and PerfettoSQL
-- **Analysis Workflow**: From interactive exploration to automated analysis
-- **Tools Overview**: Perfetto UI, trace_processor shell, Python/C++ APIs
-- **Next Steps**: Learning PerfettoSQL syntax and exploring tools
 
 ## Key Concepts for MCP Usage
 
@@ -49,14 +40,17 @@ When using this MCP server's tools, the official documentation provides essentia
 3. **Analysis Workflow**: How to progress from basic to advanced analysis
 4. **Standard Library**: Pre-built functions available in queries. For better sql analysis, use standard library tables and aggregated results rather than querying and processing direct sql results.
  - https://perfetto.dev/docs/analysis/stdlib-docs
+5. **Package Prelude**: Prelude is a special module and is automatically included. It contains key helper tables, views and functions which are universally useful.
  - https://perfetto.dev/docs/analysis/stdlib-docs#package-prelude
+6. **CPU scheduler**: CPU scheduler events and states. These are important for understanding the CPU scheduler and the scheduling of threads.
+ - https://perfetto.dev/docs/data-sources/cpu-scheduling
+ - https://perfetto.dev/docs/data-sources/cpu-freq
 
 ## Recommended Reading Order
-
-1. Start with the getting started guid`e (link above)
+1. Start with the getting started guide (link above)
 2. Learn PerfettoSQL syntax and concepts  
 3. Explore the standard library modules
-4. Try the interactive tools alongside this MCP server
+4. Use the execute_sql_query tool to analyze the trace
 
 For the most up-to-date information, always refer to the official documentation at https://perfetto.dev/docs/analysis/getting-started
 """
