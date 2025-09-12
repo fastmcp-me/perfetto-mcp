@@ -2,13 +2,11 @@
 
 ## Architecture & Data Model
 
-**Perfetto Stack**: Producers (kernel ftrace, Android framework atrace, app instrumentation) → Tracing Service (traced) → Trace File (.perfetto-trace protobuf) → Trace Processor (SQL engine) / Perfetto UI
-
 **Core Data Types**:
 - **Slices**: Time-bounded events with start/end timestamps, can be nested to show call stacks. Depth parameter indicates nesting level.
 - **Counters**: Time-series numeric values (CPU freq, memory, battery) sampled at timestamps
 - **Thread States**: Scheduling information with state transitions
-- **Flows/Links**: Arrows connecting cause→effect across threads/processes
+- **Flows/Links**: Arrows connecting cause->effect across threads/processes
 
 **Track Hierarchy**:
 - CPU core tracks: Per-core runnable thread slices
@@ -30,7 +28,7 @@
 
 ## Mental model
 
-Perfetto gives a unified, system-wide timeline joining kernel, framework/services, and app events so you can answer: what ran, where, and for how long. Core primitives the LLM should use: Tracks (CPU cores, processes, threads, counters), Slices (bounded work like Choreographer#doFrame or Binder transact), Counters (CPU freq/util, heap size, battery/GPU), and Flows (cause→effect across threads/processes).
+Perfetto gives a unified, system-wide timeline joining kernel, framework/services, and app events so you can answer: what ran, where, and for how long. Core primitives the LLM should use: Tracks (CPU cores, processes, threads, counters), Slices (bounded work like Choreographer#doFrame or Binder transact), Counters (CPU freq/util, heap size, battery/GPU), and Flows (cause->effect across threads/processes).
 
 **Key Analysis Queries**:
 ```sql
@@ -64,11 +62,11 @@ FROM slice WHERE name LIKE 'GC_%';
 2. **Identify window**: Examine 100ms-1s before ANR detection (critical period)
 3. **Main thread analysis**:
    - Last responsive moment
-   - State transitions: Running (R) → Sleeping (S) or Uninterruptible Sleep (D)
+   - State transitions: Running (R) -> Sleeping (S) or Uninterruptible Sleep (D)
    - Check for: I/O operations, binder transactions, lock waits, GC pauses
 4. **Trace dependencies**:
    - Wake-up chains between threads
-   - Binder transaction flows (client → server spans)
+   - Binder transaction flows (client -> server spans)
    - Shared resource access patterns
 5. **System factors**:
    - CPU saturation (many runnable threads)
@@ -111,10 +109,10 @@ FROM slice WHERE name LIKE 'GC_%';
 - **Allocation patterns**: Spikes >10MB/sec during animations, monotonic growth (leaks), rapid alloc/free cycles (churn)
 
 **Cascading Failure Recognition**:
-- Memory pressure → GC storms → frame drops
-- CPU saturation → scheduling delays → ANR
-- Thermal rise → frequency throttling → system-wide slowdown
-- Lock contention → priority inversions → RenderThread delays
+- Memory pressure -> GC storms -> frame drops
+- CPU saturation -> scheduling delays -> ANR
+- Thermal rise -> frequency throttling -> system-wide slowdown
+- Lock contention -> priority inversions -> RenderThread delays
 
 ## System Components Analysis
 
@@ -231,30 +229,30 @@ FROM slice WHERE name LIKE 'GC_%';
 	- Binder pool for long remote calls or queue buildup.
 4.	Correlate with CPUs: were cores busy? Was the thread runnable but unscheduled? What frequencies were set?
 5.	Identify waits: I/O (disk/net), mutex, scheduler wait, Binder reply latency.
-6.	Scan counters: RAM spikes → GC; pinned low CPU freq → latency/thermal; current spikes → power regressions.
-7.	Validate causality: follow flows or Binder chains request→work→response.
+6.	Scan counters: RAM spikes -> GC; pinned low CPU freq -> latency/thermal; current spikes -> power regressions.
+7.	Validate causality: follow flows or Binder chains request->work->response.
 8.	Summarize the root cause in one sentence with evidence.
 
 ## Common Anti-patterns & Solutions
 
 **Main Thread Violations**:
-- Synchronous file I/O → Use background threads
-- Network calls → AsyncTask/Coroutines
-- Database queries → Room with LiveData
-- Bitmap decoding → Background + caching
-- SharedPreferences commit() → Use apply()
+- Synchronous file I/O -> Use background threads
+- Network calls -> AsyncTask/Coroutines
+- Database queries -> Room with LiveData
+- Bitmap decoding -> Background + caching
+- SharedPreferences commit() -> Use apply()
 
 **Layout Inefficiencies**:
-- Nested LinearLayouts with weights → ConstraintLayout
-- Complex RelativeLayout chains → Flatten hierarchy
-- Multiple onLayout per frame → Optimize invalidation
-- Deep view hierarchies → Merge/ViewStub
+- Nested LinearLayouts with weights -> ConstraintLayout
+- Complex RelativeLayout chains -> Flatten hierarchy
+- Multiple onLayout per frame -> Optimize invalidation
+- Deep view hierarchies -> Merge/ViewStub
 
 **Object Allocation Hot Paths**:
-- Allocations in onDraw() → Pre-allocate
-- String concatenation in loops → StringBuilder
-- Creating objects in tight loops → Object pools
-- Autoboxing in performance code → Primitive arrays
+- Allocations in onDraw() -> Pre-allocate
+- String concatenation in loops -> StringBuilder
+- Creating objects in tight loops -> Object pools
+- Autoboxing in performance code -> Primitive arrays
 
 ## Environmental & Cross-Process Factors
 
@@ -273,7 +271,7 @@ FROM slice WHERE name LIKE 'GC_%';
 
 **Pattern Recognition Signatures**:
 - **Lock contention**: Multiple threads waiting, same wait channel, priority inversions
-- **Memory pressure cascade**: GC storms → allocation failures → lmkd kills
+- **Memory pressure cascade**: GC storms -> allocation failures -> lmkd kills
 - **Thermal throttling**: Periodic performance drops aligned with freq changes
 - **Binder exhaustion**: All Binder_N threads busy, growing transaction queue
 
@@ -313,11 +311,11 @@ FROM slice WHERE name LIKE 'GC_%';
 - Binder bottlenecks: client main thread awaiting reply; confirm server thread-pool saturation and long handlers.
 - I/O stalls: main thread touches disk/network; long syscalls; CPU cores idle while waiting.
 - GC pauses: recognizable runtime slices; correlate with heap counters & allocation bursts.
-- Thermal/CPU scaling: low frequencies under demand → latency; sustained high freq with little work → power waste.
+- Thermal/CPU scaling: low frequencies under demand -> latency; sustained high freq with little work -> power waste.
 - Lock contention: many short run slices with waits on a mutex; long critical section on the owner thread.
 
 Thread state sanity
-When a thread is slow, classify it as Running (consuming CPU), Runnable (ready but not scheduled → CPU contention or priority issue), or Waiting/Blocked (I/O, lock, Binder reply). Breakdowns across sched/thread_state plus per-core activity quickly reveal the limiting factor.
+When a thread is slow, classify it as Running (consuming CPU), Runnable (ready but not scheduled -> CPU contention or priority issue), or Waiting/Blocked (I/O, lock, Binder reply). Breakdowns across sched/thread_state plus per-core activity quickly reveal the limiting factor.
 
 ## Quick triage checklist (for the LLM)
 - Have we found the symptom window?
