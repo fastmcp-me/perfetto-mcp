@@ -209,3 +209,14 @@ Returns a JSON envelope with `result = { totalCount, contentions: [...], filters
 Notes:
 - Requires `android.monitor_contention` data; if unavailable, returns `MONITOR_CONTENTION_UNAVAILABLE`.
 - Flags critical contentions that affect the main thread or exceed duration thresholds.
+
+### 10. `binder_transaction_profiler(trace_path, process_filter, min_latency_ms=10.0, include_thread_states=True)`
+Analyzes binder transaction performance and identifies bottlenecks using the `android.binder` module.
+
+Returns a JSON envelope with `result = { totalCount, transactions: [...], filters }` where each row contains:
+`{ client_process, server_process, aidl_name, method_name, client_latency_ms, server_latency_ms, overhead_ms, is_main_thread, is_sync, top_thread_states, latency_severity }`.
+
+Notes:
+- Requires `android.binder` views (`android_binder_txns`, `android_sync_binder_thread_state_by_txn`). If unavailable, returns `BINDER_DATA_UNAVAILABLE`.
+- Filters transactions where either client or server matches `process_filter` and client latency >= `min_latency_ms`.
+- When `include_thread_states` is true, includes the top thread states by time for each transaction.

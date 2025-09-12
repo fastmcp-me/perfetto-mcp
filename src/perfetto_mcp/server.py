@@ -15,6 +15,7 @@ from .tools.frame_performance_summary import FramePerformanceSummaryTool
 from .tools.memory_leak_detector import MemoryLeakDetectorTool
 from .tools.heap_dominator_tree_analyzer import HeapDominatorTreeAnalyzerTool
 from .tools.thread_contention_analyzer import ThreadContentionAnalyzerTool
+from .tools.binder_transaction_profiler import BinderTransactionProfilerTool
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -44,6 +45,7 @@ def create_server() -> FastMCP:
     memory_leak_tool = MemoryLeakDetectorTool(connection_manager)
     heap_dom_tool = HeapDominatorTreeAnalyzerTool(connection_manager)
     thread_contention_tool = ThreadContentionAnalyzerTool(connection_manager)
+    binder_txn_tool = BinderTransactionProfilerTool(connection_manager)
 
 
     @mcp.tool()
@@ -532,6 +534,56 @@ def create_server() -> FastMCP:
         return thread_contention_tool.thread_contention_analyzer(
             trace_path,
             process_name,
+        )
+
+    @mcp.tool()
+    def binder_transaction_profiler(
+        trace_path: str,
+        process_filter: str,
+        min_latency_ms: float = 10.0,
+        include_thread_states: bool = True,
+    ) -> str:
+        """
+        Analyze binder transaction performance and identify bottlenecks.
+
+        WHEN TO USE: Investigate cross-process call delays, especially those impacting
+        the main thread. Surfaces client/server latencies, overhead, and (optionally)
+        top thread states during each transaction.
+
+        Parameters
+        ----------
+        trace_path : str
+            Path to the Perfetto trace file.
+        process_filter : str
+            Process name to match either as client or server process.
+        min_latency_ms : float, optional
+            Minimum client latency to include (ms). Default: 10.0.
+        include_thread_states : bool, optional
+            If true, includes aggregated top thread states per transaction. Default: True.
+
+        Returns
+        -------
+        str
+            JSON envelope with fields:
+            - processName, tracePath, success, error, result
+            - result: {
+                totalCount,
+                transactions: [{ client_process, server_process, aidl_name, method_name,
+                                  client_latency_ms, server_latency_ms, overhead_ms,
+                                  is_main_thread, is_sync, top_thread_states, latency_severity }],
+                filters: { process_filter, min_latency_ms, include_thread_states }
+              }
+
+        Notes
+        -----
+        - Requires android.binder module/views in the trace. If unavailable, returns
+          BINDER_DATA_UNAVAILABLE with details.
+        """
+        return binder_txn_tool.binder_transaction_profiler(
+            trace_path,
+            process_filter,
+            min_latency_ms,
+            include_thread_states,
         )
 
     # Setup cleanup using atexit
