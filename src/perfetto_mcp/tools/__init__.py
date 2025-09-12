@@ -1,15 +1,30 @@
 """Perfetto MCP Tools - Individual tool implementations for trace analysis."""
 
-from .base import BaseTool
+from .base import BaseTool, ToolError
 from .slice_info import SliceInfoTool
 from .sql_query import SqlQueryTool
 from .cpu_utilization import CpuUtilizationProfilerTool
 from .thread_contention_analyzer import ThreadContentionAnalyzerTool
+from .anr_detection import AnrDetectionTool
+from .anr_root_cause import AnrRootCauseTool
+from .binder_transaction_profiler import BinderTransactionProfilerTool
+from .frame_performance_summary import FramePerformanceSummaryTool
+from .heap_dominator_tree_analyzer import HeapDominatorTreeAnalyzerTool
+from .jank_frames import JankFramesTool
+from .memory_leak_detector import MemoryLeakDetectorTool
 
 __all__ = [
     "BaseTool",
+    "ToolError",
     "SliceInfoTool",
     "SqlQueryTool",
     "CpuUtilizationProfilerTool",
     "ThreadContentionAnalyzerTool",
+    "AnrDetectionTool",
+    "AnrRootCauseTool",
+    "BinderTransactionProfilerTool",
+    "FramePerformanceSummaryTool",
+    "HeapDominatorTreeAnalyzerTool",
+    "JankFramesTool",
+    "MemoryLeakDetectorTool",
 ]
