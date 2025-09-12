@@ -14,6 +14,7 @@ from .tools.jank_frames import JankFramesTool
 from .tools.frame_performance_summary import FramePerformanceSummaryTool
 from .tools.memory_leak_detector import MemoryLeakDetectorTool
 from .tools.heap_dominator_tree_analyzer import HeapDominatorTreeAnalyzerTool
+from .tools.thread_contention_analyzer import ThreadContentionAnalyzerTool
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -42,6 +43,7 @@ def create_server() -> FastMCP:
     frame_summary_tool = FramePerformanceSummaryTool(connection_manager)
     memory_leak_tool = MemoryLeakDetectorTool(connection_manager)
     heap_dom_tool = HeapDominatorTreeAnalyzerTool(connection_manager)
+    thread_contention_tool = ThreadContentionAnalyzerTool(connection_manager)
 
 
     @mcp.tool()
@@ -488,6 +490,49 @@ def create_server() -> FastMCP:
           HEAP_GRAPH_UNAVAILABLE error.
         """
         return heap_dom_tool.heap_dominator_tree_analyzer(trace_path, process_name, max_classes)
+
+    @mcp.tool()
+    def thread_contention_analyzer(
+        trace_path: str,
+        process_name: str,
+    ) -> str:
+        """
+        Identify thread contention and synchronization bottlenecks for a process.
+
+        WHEN TO USE: Investigate stalls due to Java monitor lock contention, especially
+        on the main thread. Highlights which threads/methods are blocking and the
+        extent of blocking.
+
+        Parameters
+        ----------
+        trace_path : str
+            Path to the Perfetto trace file.
+        process_name : str
+            Exact process name to analyze.
+
+        Returns
+        -------
+        str
+            JSON envelope with fields:
+            - processName, tracePath, success, error, result
+            - result: {
+                totalCount,
+                contentions: [{ blocked_thread_name, blocking_thread_name,
+                                short_blocking_method_name, contention_count,
+                                total_blocked_ms, avg_blocked_ms, max_blocked_ms,
+                                total_waiters, max_concurrent_waiters, severity }],
+                filters: { process_name }
+              }
+
+        Notes
+        -----
+        - Requires android.monitor_contention module in the trace. If unavailable,
+          returns MONITOR_CONTENTION_UNAVAILABLE with details.
+        """
+        return thread_contention_tool.thread_contention_analyzer(
+            trace_path,
+            process_name,
+        )
 
     # Setup cleanup using atexit
     atexit.register(connection_manager.cleanup)

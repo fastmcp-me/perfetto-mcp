@@ -155,6 +155,7 @@ Examples:
 - anr_root_cause_analyzer → `result = { window, filters, mainThreadBlocks, binderDelays, memoryPressure, lockContention, insights, notes }`
 - cpu_utilization_profiler → `result = { processName, groupBy, summary, threads, frequency }`
 - detect_jank_frames → `result = { totalCount, frames: [...], filters }`
+- thread_contention_analyzer → `result = { totalCount, contentions: [...], filters }`
 
 ## Dependencies
 
@@ -198,3 +199,13 @@ If you see a `*_DATA_UNAVAILABLE` error, re-capture with the relevant data sourc
 - Python MCP SDK: https://github.com/modelcontextprotocol/python-sdk
 - Perfetto Trace Analysis: https://perfetto.dev/docs/analysis/getting-started
 - Perfetto TraceProcessor: https://perfetto.dev/docs/analysis/trace-processor-python
+
+### 9. `thread_contention_analyzer(trace_path, process_name)`
+Identifies thread contention and synchronization bottlenecks using the `android.monitor_contention` module.
+
+Returns a JSON envelope with `result = { totalCount, contentions: [...], filters }` where each row contains:
+`{ blocked_thread_name, blocking_thread_name, short_blocking_method_name, contention_count, total_blocked_ms, avg_blocked_ms, max_blocked_ms, total_waiters, max_concurrent_waiters, severity }`.
+
+Notes:
+- Requires `android.monitor_contention` data; if unavailable, returns `MONITOR_CONTENTION_UNAVAILABLE`.
+- Flags critical contentions that affect the main thread or exceed duration thresholds.
