@@ -34,7 +34,7 @@ class SliceInfoTool(BaseTool):
             # Basic sanitization for embedding into SQL string
             safe_name = slice_name.replace("'", "''")
 
-            # 1) Summary and time bounds
+            # 1) Summary and time bounds (global across processes), case-insensitive name match
             summary_query = (
                 "SELECT "
                 "  COUNT(*) AS total_count, "
@@ -43,7 +43,7 @@ class SliceInfoTool(BaseTool):
                 "  MAX(dur) AS max_dur_ns, "
                 "  MIN(ts) AS earliest_ts_ns, "
                 "  MAX(ts) AS latest_ts_ns "
-                f"FROM slice WHERE name = '{safe_name}'"
+                f"FROM slice WHERE UPPER(name) = UPPER('{safe_name}')"
             )
 
             total_count = 0
@@ -74,7 +74,7 @@ class SliceInfoTool(BaseTool):
                 "WITH candidates AS (\n"
                 "  SELECT s.id, s.ts, s.dur, s.depth, s.category, s.track_id\n"
                 "  FROM slice s\n"
-                f"  WHERE s.name = '{safe_name}'\n"
+                f"  WHERE UPPER(s.name) = UPPER('{safe_name}')\n"
                 ")\n"
                 "SELECT\n"
                 "  c.id AS slice_id,\n"
@@ -95,9 +95,24 @@ class SliceInfoTool(BaseTool):
                 "LEFT JOIN thread th ON ttr.utid = th.utid\n"
                 "LEFT JOIN process_track pt ON c.track_id = pt.id\n"
                 "LEFT JOIN process p ON COALESCE(th.upid, pt.upid) = p.upid\n"
+            )
+
+            examples_query += (
                 "ORDER BY c.dur DESC\n"
                 f"LIMIT {max_examples};"
             )
+
+            # 3) Similar names (wildcard contains), case-insensitive
+            other_slices: List[str] = []
+            other_slices_query = (
+                "SELECT name, COUNT(*) AS cnt\n"
+                "FROM slice\n"
+                f"WHERE UPPER(name) LIKE UPPER('%{safe_name}%')\n"
+                "GROUP BY name\n"
+                "ORDER BY cnt DESC\n"
+                "LIMIT 20;"
+            )
+
 
             examples: List[Dict[str, Any]] = []
             try:
@@ -121,6 +136,15 @@ class SliceInfoTool(BaseTool):
             except Exception as e:
                 logger.warning(f"Examples query failed: {e}")
 
+            # Collect other slices withsimilar names
+            try:
+                for row in tp.query(other_slices_query):
+                    name_val = getattr(row, "name", None)
+                    if isinstance(name_val, str):
+                        other_slices.append(name_val)
+            except Exception as e:
+                logger.info(f"Similar names query failed (non-fatal): {e}")
+
             return {
                 "sliceName": slice_name,
                 "totalCount": total_count,
@@ -135,6 +159,7 @@ class SliceInfoTool(BaseTool):
                     "spanMs": span_ms,
                 },
                 "examples": examples,
+                "otherSlices": other_slices,
             }
 
         return self.run_formatted(trace_path, process_name, _get_slice_info_operation)
