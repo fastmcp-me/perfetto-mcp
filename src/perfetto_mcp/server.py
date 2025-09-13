@@ -51,43 +51,30 @@ def create_server() -> FastMCP:
     @mcp.tool()
     def get_slice_info(trace_path: str, slice_name: str, process_name: str | None = None) -> str:
         """
-        Filter and summarize all occurrences of a specific slice (exact name).
+        Get comprehensive statistics and examples for a specific slice name in the trace.
 
-        WHEN TO USE: Quickly understand how often a slice appears, its timing
-        distribution at a glance, and see a few worst-case examples with context
-        (process/thread/track).
+        USE THIS WHEN: You need to quickly understand the performance characteristics of a 
+        specific operation/slice - its frequency, duration distribution, and worst cases. 
+        Perfect for initial investigation of known slice names like "DrawFrame", "bindApplication", 
+        or custom app markers.
 
-        SEARCH BEHAVIOR: Performs EXACT case-sensitive string matching. "main" !=
-        "Main" != "MAIN". The `slice_name` must match exactly what appears in the
-        trace data.
+        NOT FOR: Complex filtering (duration > X, specific time ranges, multiple conditions) - 
+        use execute_sql_query instead.
 
-        OUTPUT FIELDS (result):
-        - sliceName: Input name
-        - totalCount: Total number of matching slices
-        - durationSummary: { minMs, avgMs, maxMs }
-        - timeBounds: { earliestTsMs, latestTsMs, spanMs }
-        - examples: Up to 50 longest instances with fields:
-          { sliceId, tsMs, endTsMs, durMs, depth, category, trackName,
-            process_name, pid, thread_name, tid, is_main_thread }
+        INPUT: 
+        - slice_name: Exact name (case-insensitive)
 
-        Parameters
-        ----------
-        trace_path : str
-            Path to the Perfetto trace file
-        slice_name : str
-            EXACT name of slice to analyze.
+        OUTPUT: 
+        - Total count and time span
+        - Duration statistics (min/avg/max in milliseconds)
+        - Up to 50 longest instances with full context (process, thread, timestamp)
+        - otherSlices: Up to 20 other slice names that contain the provided text (case-insensitive)
 
-        Returns
-        -------
-        str
-            JSON envelope with fields:
-            - processName, tracePath, success, error, result
-            - result: see OUTPUT FIELDS above
+        EXAMPLE: get_slice_info("trace.pb", "DrawFrame") returns frame rendering statistics
+        EXAMPLE: get_slice_info("trace.pb", "GC") returns garbage collection events
 
-        Notes
-        -----
-        - For complex filtering (duration > X, time ranges, process filters),
-          use execute_sql_query() with WHERE clauses.
+        TYPICAL FOLLOW-UP: If you find problematic slices, use execute_sql_query to analyze 
+        their relationship to ANRs or jank events at specific timestamps.
         """
         return slice_info_tool.get_slice_info(trace_path, slice_name, process_name)
 
@@ -95,41 +82,33 @@ def create_server() -> FastMCP:
     @mcp.tool()
     def execute_sql_query(trace_path: str, sql_query: str, process_name: str | None = None) -> str:
         """
-        Execute arbitrary SQL queries against a Perfetto trace database.
-        
-        This is the most powerful tool for trace analysis, allowing you to write custom
-        SQL queries against the trace database. The Perfetto trace database contains
-        multiple tables (slice, thread, process, counter, etc.) that you can query
-        using standard SQL syntax. Results return all matching rows (no automatic LIMIT is applied).
+        Execute custom SQL queries on trace data for advanced analysis.
 
-        Parameters
-        ----------
-        trace_path : str
-            Absolute or relative path to the Perfetto trace file (.pftrace, .pb files).
-            The file must be a valid Perfetto trace that can be opened by TraceProcessor.
-        sql_query : str
-            SQL query to execute against the trace database. Only SELECT statements are
-            allowed for security reasons. Available tables include: slice, thread,
-            process, counter, args, track, and many others.
+        USE THIS WHEN: Other tools don't provide what you need, you need complex filtering/joins, 
+        or you want to correlate data across multiple tables. This is your power tool for custom 
+        analysis - use it when pre-built tools are too limiting.
 
-        Returns
-        -------
-        str
-            JSON envelope with fields:
-            - processName, tracePath, success, error, result
-            - result: { query, columns, rows, rowCount }
+        CAPABILITIES: Full SQL access to all trace tables including:
+        - slice: All trace slices with timing
+        - thread/process: Thread and process metadata
+        - counter: Performance counters over time
+        - android_anrs: ANR events
+        - actual_frame_timeline_slice: Frame jank data
+        - sched_slice: CPU scheduling information
+        - android_binder_txns: Cross-process calls
+        - heap_graph_*: Memory heap analysis
 
-        Security Notes
-        -------------
-        - Only SELECT queries are permitted
-        - SQL injection protection through query validation
+        SECURITY: Only SELECT queries allowed (no modifications). No automatic LIMIT is applied; 
+        large queries may return many rows.
 
-        Examples
-        --------
-        execute_sql_query("trace.pftrace", "SELECT name, COUNT(*) FROM slice GROUP BY name ORDER BY COUNT(*) DESC")
-        execute_sql_query("trace.pb", "SELECT ts, dur, tid FROM slice WHERE dur > 1000000")
-        execute_sql_query("trace.pftrace", "SELECT DISTINCT name FROM thread")
-        execute_sql_query("trace.pb", "SELECT * FROM process WHERE name LIKE '%chrome%'")
+        COMMON PATTERNS:
+        - Duration analysis: "SELECT name, dur/1e6 as ms FROM slice WHERE dur > 10e6"
+        - Aggregation: "SELECT name, COUNT(*), AVG(dur)/1e6 FROM slice GROUP BY name"
+        - Time filtering: "SELECT * FROM slice WHERE ts BETWEEN 1e9 AND 2e9"
+        - Process filtering: "SELECT * FROM thread WHERE upid IN (SELECT upid FROM process WHERE name LIKE '%chrome%')"
+
+        POWER USER TIP: Join android_anrs with slice/thread_state tables to understand 
+        what was happening during ANR events.
         """
         return sql_query_tool.execute_sql_query(trace_path, sql_query, process_name)
 
@@ -137,17 +116,18 @@ def create_server() -> FastMCP:
     @mcp.tool()
     def detect_anrs(trace_path: str, process_name: str | None = None, min_duration_ms: int = 5000, time_range: dict | None = None) -> str:
         """
-        Detect ANR (Application Not Responding) events in a Perfetto trace with contextual analysis.
-        
-        WHEN TO USE: Use this tool to identify ANR events in Android application traces. ANRs occur 
-        when the main thread is blocked for more than 5 seconds (by default), causing the system 
-        to show "App Not Responding" dialogs. This tool provides comprehensive analysis including 
-        main thread state, GC pressure, and severity assessment.
-        
-        WHAT YOU GET: Structured JSON output with detailed ANR information including timestamps, 
-        process details, main thread states, concurrent GC events, and severity analysis. Each 
-        ANR includes contextual data to help understand root causes.
-        
+        USE THIS WHEN: Investigating app freezes, unresponsiveness, "not responding" dialogs, 
+        or user complaints about app hangs. ANRs are critical issues where the main thread 
+        is blocked for >5 seconds, causing Android to consider killing the app.
+
+        PROVIDES: Complete ANR list with severity assessment based on main thread state and 
+        system conditions. Each ANR includes garbage collection pressure analysis to identify 
+        memory-related causes.
+
+        FILTERS:
+        - process_name: Target app (supports wildcards: "com.example.*", "*browser*")
+        - time_range: {'start_ms': X, 'end_ms': Y} to focus on specific periods
+
         ANR ANALYSIS CONTEXT: ANRs are critical performance issues that directly impact user 
         experience. They typically occur due to:
         - Main thread blocking operations (I/O, network, database)
@@ -155,61 +135,28 @@ def create_server() -> FastMCP:
         - Memory pressure causing excessive GC
         - Binder transaction delays
         - CPU-intensive operations on the main thread
-        
-        SEVERITY LEVELS: Results include severity analysis:
-        - CRITICAL: High GC pressure (>10 events) or system process ANRs
-        - HIGH: Main thread in disk/interruptible sleep or moderate GC pressure
-        - MEDIUM: Main thread running (CPU bound) or normal conditions
-        - LOW: Minimal impact ANRs
 
-        Parameters
-        ----------
-        trace_path : str
-            Path to Perfetto trace file (.pftrace, .pb, or other Perfetto formats). The trace 
-            must be from Android system tracing with ANR detection enabled. Typical sources 
-            include systrace, perfetto system traces, or custom Android instrumentation.
-        process_name : str, optional
-            Filter ANRs by process name. Supports glob patterns (*, ?, [abc]). Examples:
-            - "com.example.app" (exact match)
-            - "com.example.*" (all processes starting with com.example.)
-            - "*browser*" (any process containing 'browser')
-            If None, returns ANRs from all processes.
-        min_duration_ms : int, optional
-            Minimum ANR duration threshold in milliseconds. Default is 5000ms (5 seconds),
-            which is the standard Android ANR threshold. Lower values may include shorter
-            blocking events that don't trigger system ANR dialogs.
-        time_range : dict, optional
-            Filter ANRs by time range with keys:
-            - 'start_ms': Start time in milliseconds from trace beginning
-            - 'end_ms': End time in milliseconds from trace beginning
-            If None, analyzes the entire trace duration.
+        OUTPUT: 
+        - Timestamp and process information for each ANR
+        - Main thread state (last known state at ANR ts)
+        - GC event count near ANR (>10 events = memory pressure)
+        - Severity heuristic: CRITICAL if GC>10; HIGH if main thread in sleep/IO wait or moderate GC; 
+          MEDIUM otherwise (system-critical processes escalate severity)
 
-        Returns
-        -------
-        str
-            JSON envelope with fields:
-            - processName, tracePath, success, error, result
-            - result: {
-                totalCount,
-                anrs: [{ process_name, pid, upid, ts, timestampMs, subject, main_thread_state, gc_events_near_anr, severity }...],
-                filters: { process_name, min_duration_ms, time_range }
-              }
+        NEXT STEPS: 
+        1. Use anr_root_cause_analyzer with ANR timestamp for deep analysis
+        2. Check thread_contention_analyzer for lock-related causes
+        3. Run binder_transaction_profiler if ANR involves system services
 
-        AI Agent Usage Notes
-        -------------------
-        - ANR data requires Android system traces with 'android.anrs' data source enabled
+        INTERPRETATION: Multiple ANRs in short time = systemic issue. Single ANR = investigate 
+        specific timestamp. No ANRs doesn't guarantee good performance - check jank metrics too.
+
+        - Requires 'android.anrs' data source in the trace; otherwise returns ANR_DATA_UNAVAILABLE
         - Ensure the trace contains Android performance data
         - High ANR counts indicate systemic performance issues requiring investigation
         - Correlate ANR timestamps with other performance metrics (frame drops, memory pressure)
         - For detailed root cause analysis, use execute_sql_query() with ANR timestamps
         - Zero ANRs doesn't mean good performance - check trace coverage and data sources
-        
-        Common Follow-up Queries
-        -----------------------
-        - Thread state analysis around ANR timestamps
-        - Binder transaction analysis during ANR periods  
-        - Memory allocation patterns before ANRs
-        - CPU utilization and scheduling data during ANRs
         """
         return anr_detection_tool.detect_anrs(trace_path, process_name, min_duration_ms, time_range)
 
@@ -224,53 +171,39 @@ def create_server() -> FastMCP:
         deep_analysis: bool = False,
     ) -> str:
         """
-        Analyze likely ANR root causes by correlating multiple signals within a time window.
+        Comprehensive root cause analysis for ANR events using multi-signal correlation.
 
-        WHEN TO USE: After detecting an ANR timestamp (via detect_anrs or otherwise), run this tool
-        for the affected process to quickly surface likely causes such as slow Binder calls, main
-        thread IO/sleep, Java monitor contention, and memory pressure.
+        USE THIS WHEN: After detect_anrs finds an ANR, investigating a known freeze timestamp, 
+        or when users report specific times when the app became unresponsive. This tool looks 
+        at a ±10 second window around the issue to identify root causes.
 
-        SIGNALS AT A GLANCE
-        - Main thread blocking: Long non-running states on the app's main thread (e.g., IO wait or
-          sleeping) that directly prevent UI event handling and can trigger ANRs.
-        - Binder delays: Slow outbound Binder calls from the app (often the main thread) indicating
-          the app is waiting on a remote service/System Server; common in input/provider ANRs.
-        - Memory pressure: Low or rapidly dropping MemAvailable around the window suggesting GC/LMK
-          pressure contributing to long stalls and poor responsiveness.
-        - Java monitor contention: Long waits on synchronized monitors on the main thread showing
-          which thread/method is blocking; indicates lock contention or potential deadlocks.
+        ANALYZES FOUR KEY SIGNALS:
+        1. Main thread blocking: Long non-running states (I/O wait, sleeping) preventing UI updates
+        2. Binder delays: Slow IPC calls to system services (>100ms transactions)
+        3. Memory pressure: Low available memory forcing excessive GC
+        4. Lock contention: Java synchronized blocks causing thread waits
 
-        PARAMETERS
-        ----------
-        trace_path : str
-            Path to the Perfetto trace file.
-        process_name : str, optional
-            Filter by process name (supports GLOB). Example: "com.example.*". If omitted, runs without
-            process filter where possible, but some signals (monitor contention) require a process.
-        anr_timestamp_ms : int, optional
-            Anchor timestamp in milliseconds from trace start. Used to build a symmetric window when
-            time_range is not provided.
-        analysis_window_ms : int, optional
-            Half-window around the anchor timestamp. Default 10,000 (±10s).
-        time_range : dict, optional
-            Explicit time window: { 'start_ms': int, 'end_ms': int }. If provided together with
-            anr_timestamp_ms, the timestamp must lie within the range; otherwise the tool returns an
-            INVALID_PARAMETERS error asking for clarification.
-        deep_analysis : bool, optional
-            If true, strengthens insights heuristics (e.g., prioritization notes when multiple causes exist).
+        PARAMETERS:
+        - process_name: Target process (required for some analyses)
+        - anr_timestamp_ms OR time_range: The moment to investigate
+        - analysis_window_ms: Context window size (default ±10 seconds)
+        - deep_analysis: true for enhanced correlation insights
+        - Validation: If both anr_timestamp_ms and time_range are provided, the timestamp must 
+          lie within the time_range or the tool returns INVALID_PARAMETERS
 
-        RETURNS
-        -------
-        str
-            JSON envelope { processName, tracePath, success, error, result } where result contains:
-            - window: { startMs, endMs }
-            - filters: { process_name }
-            - mainThreadBlocks: [{ tsMs, durMs, state, ioWait, wakerUtid, wakerThreadName, wakerProcessName }]
-            - binderDelays: [{ binderTxnId, clientTsMs, clientDurMs, serverProcess, aidlName, methodName, clientMainThread }]
-            - memoryPressure: { start: { tsMs, availableMemoryMb }, end: { ... }, deltaMb }
-            - lockContention: [{ blockedThreadName, blockingThreadName, blockedMethod, shortBlockingMethod, blockingSrc, waiterCount, blockedThreadWaiterCount, durMs, tsMs }]
-            - insights: { likelyCauses, rationale, signalsUsed }
-            - notes: [ ... ]
+        OUTPUT INSIGHTS:
+        - "likelyCauses": Ranked list of probable root causes
+        - "rationale": Explanation of why each cause was identified
+        - Detailed data for each signal type
+        - Correlation notes when multiple causes interact
+
+        STRENGTH: Unlike single-signal tools, this correlates multiple data sources to identify 
+        the true root cause. For example, it can distinguish between "ANR due to lock contention 
+        during GC" vs "ANR due to slow binder call" vs "ANR due to CPU starvation".
+
+        TYPICAL FINDING: Most ANRs are caused by main thread lock contention or synchronous 
+        binder calls, not CPU overload. Requires binder and monitor_contention modules in the 
+        trace for those signals; missing modules are reported in 'notes'.
         """
         return anr_root_cause_tool.anr_root_cause_analyzer(
             trace_path,
@@ -289,34 +222,36 @@ def create_server() -> FastMCP:
         include_frequency_analysis: bool = True,
     ) -> str:
         """
-        Profile CPU utilization for a process with per-thread breakdown.
+        Profile CPU usage by thread to identify performance bottlenecks.
 
-        WHEN TO USE: Understand which threads consume CPU over the trace duration, how often they're
-        scheduled, and whether the main thread is CPU-bound. Optionally correlate with CPU frequency
-        (DVFS) when the trace contains frequency counters.
+        USE THIS WHEN: Investigating high battery drain, thermal throttling, slow performance, 
+        or determining if your app is CPU-bound. Essential for understanding whether performance 
+        issues are due to excessive CPU usage or other factors (I/O, lock contention, etc.).
 
-        PARAMETERS
-        ----------
-        trace_path : str
-            Path to the Perfetto trace file.
-        process_name : str
-            Target process (supports GLOB patterns, e.g. "com.example.*").
-        group_by : str, optional
-            Currently only "thread" is supported. Default: "thread".
-        include_frequency_analysis : bool, optional
-            If true, includes avg CPU frequency (kHz) and per-CPU stats when available. Default: True.
+        SHOWS PER-THREAD:
+        - CPU percentage of trace duration
+        - Total runtime and scheduling counts
+        - Average/max time slices (long slices = good, many short = thrashing)
+        - CPUs used (indicates thread migration)
+        - Optional: CPU frequency analysis if trace has DVFS data
 
-        RETURNS
-        -------
-        str
-            JSON envelope with fields:
-            - processName, tracePath, success, error, result
-            - result: {
-                processName, groupBy,
-                summary: { runtimeSecondsTotal, cpuPercentOfTrace, threadsCount },
-                threads: [ { threadName, isMainThread, runtimeSeconds, cpuPercent, cpusUsed, scheduleCount, avgSliceMs, maxSliceMs }... ],
-                frequency: { avgCpuFreqKHz, perCpu: [{ cpu, avgKHz, minKHz, maxKHz }] } | null
-              }
+        KEY METRICS:
+        - Main thread >80% CPU: UI work needs offloading
+        - Background thread >90%: Consider chunking work
+        - Many threads with low %: Possible over-threading
+        - High schedule count with low CPU%: Lock contention likely
+
+        PROCESS PATTERNS:
+        - process_name: Supports wildcards ("com.example.*")
+        - group_by: Currently "thread" only
+        - include_frequency_analysis: Adds CPU frequency correlation
+
+        INTERPRETATION: High CPU doesn't always mean inefficient code - could indicate thermal 
+        throttling keeping CPU at low frequencies. Compare with cpu_frequency data. If CPU usage 
+        is low but performance is poor, investigate lock contention or I/O blocking instead.
+
+        OUTPUT: Ranked thread list by CPU usage, with main thread flagged. Use this to identify 
+        which specific threads need optimization.
         """
         return cpu_util_tool.cpu_utilization_profiler(
             trace_path,
@@ -333,35 +268,38 @@ def create_server() -> FastMCP:
         severity_filter: list[str] | None = None,
     ) -> str:
         """
-        Detect janky frames with severity and source classification.
+        Find dropped/janky frames with detailed performance classification.
 
-        WHEN TO USE: Investigate UI performance issues for a specific process.
-        Identifies jank type, severity, overrun, CPU/UI time, and whether the
-        jank originated in the app vs SurfaceFlinger.
+        USE THIS WHEN: UI feels sluggish, scrolling stutters, animations aren't smooth, or 
+        you need to quantify UI performance issues. Jank directly impacts user experience - 
+        even a few janky frames can make an app feel unprofessional.
 
-        Parameters
-        ----------
-        trace_path : str
-            Path to the Perfetto trace file.
-        process_name : str
-            Exact process name to analyze (as stored in the trace).
-        jank_threshold_ms : float, optional
-            Frame duration threshold (ms) to consider a frame janky. Default: 16.67.
-        severity_filter : list[str] | None, optional
-            Filter by jank severity types (e.g. ["severe", "moderate"]).
+        DETECTS:
+        - Frames exceeding deadline (16.67ms for 60fps, 8.33ms for 120fps)
+        - Jank source: Application vs SurfaceFlinger (system compositor)
+        - Severity: mild, moderate, severe based on deadline overrun
+        - CPU/UI thread time per frame
 
-        Returns
-        -------
-        str
-            JSON envelope with fields:
-            - processName, tracePath, success, error, result
-            - result: {
-                totalCount,
-                frames: [{ frame_id, timestamp_ms, duration_ms, overrun_ms, jank_type,
-                           jank_severity_type, jank_source, cpu_time_ms, ui_time_ms,
-                           layer_name, jank_classification }...],
-                filters: { process_name, jank_threshold_ms, severity_filter }
-              }
+        PARAMETERS:
+        - process_name: Exact app name from trace
+        - jank_threshold_ms: 16.67 (60fps) or 8.33 (120fps) 
+        - severity_filter: ["severe", "moderate"] to focus on worst cases
+
+        OUTPUT INCLUDES:
+        - frame_id, timestamp, duration for correlation
+        - overrun_ms: How much the frame missed deadline
+        - jank_type and source (app vs system)
+        - CPU/UI time breakdown
+        - Classification: SMOOTH/JANK/BIG_JANK/HUGE_JANK
+
+        INTERPRETATION:
+        - Occasional jank (<1% frames): Normal
+        - Consistent jank (>5% frames): User-visible problem
+        - Jank clusters: Check for GC, I/O, or lock contention at those times
+        - SurfaceFlinger jank: System issue, not your app
+
+        FOLLOW-UP: Use frame timestamps to correlate with execute_sql_query for what was 
+        happening during janky frames (GC events, binder calls, CPU frequency).
         """
         return jank_frames_tool.detect_jank_frames(
             trace_path,
@@ -373,29 +311,37 @@ def create_server() -> FastMCP:
     @mcp.tool()
     def frame_performance_summary(trace_path: str, process_name: str) -> str:
         """
-        Summarize frame performance with jank and CPU stats.
+        High-level frame performance metrics and overall UI smoothness assessment.
 
-        WHEN TO USE: High-level overview of a process's frame stability and
-        rendering cost. Produces jank counts/rate and CPU time distribution.
+        USE THIS WHEN: Need a quick performance rating, establishing baseline metrics, comparing 
+        before/after optimization, or getting an overview before deep-diving into specific frames. 
+        This gives you the "forest view" while detect_jank_frames shows individual "trees".
 
-        Parameters
-        ----------
-        trace_path : str
-            Path to the Perfetto trace file.
-        process_name : str
-            Exact process name to analyze.
+        PROVIDES:
+        - Total frame count and jank statistics
+        - Jank rate percentage (key metric for UI smoothness)
+        - Frame categories: slow, jank, big jank, huge jank
+        - CPU time distribution: average, max, P95, P99
+        - Performance rating: EXCELLENT/GOOD/ACCEPTABLE/POOR
 
-        Returns
-        -------
-        str
-            JSON envelope with fields:
-            - processName, tracePath, success, error, result
-            - result: {
-                total_frames, jank_frames, jank_rate_percent,
-                slow_frames, big_jank_frames, huge_jank_frames,
-                avg_cpu_time_ms, max_cpu_time_ms, p95_cpu_time_ms, p99_cpu_time_ms,
-                performance_rating
-              }
+        PERFORMANCE STANDARDS:
+        - EXCELLENT: <1% jank rate (console-quality smoothness)
+        - GOOD: 1-5% jank rate (most users won't notice)
+        - ACCEPTABLE: 5-10% jank rate (power users will complain)
+        - POOR: >10% jank rate (all users affected)
+
+        KEY INSIGHTS:
+        - P99 CPU time: Your worst-case frame cost
+        - Max CPU time: Spike detection (GC, loading, etc.)
+        - Big/huge jank counts: Critical frames that users definitely noticed
+
+        TYPICAL WORKFLOW:
+        1. Run this first for overall assessment
+        2. If POOR/ACCEPTABLE, use detect_jank_frames for specific bad frames
+        3. Correlate bad frame timestamps with other events
+
+        NOTE: Different content types have different standards. Games might accept 5% jank 
+        during action scenes, while a reading app should maintain <1% always.
         """
         return frame_summary_tool.frame_performance_summary(trace_path, process_name)
 
@@ -407,39 +353,42 @@ def create_server() -> FastMCP:
         analysis_duration_ms: int = 60_000,
     ) -> str:
         """
-        Detect memory leaks through heap growth pattern analysis and heap graph.
+        Detect memory leaks through heap growth patterns and suspicious class analysis.
 
-        WHEN TO USE: Identify potential memory leaks indicated by sustained RSS growth
-        and large retained heap sizes for specific classes.
+        USE THIS WHEN: Investigating OOM crashes, gradual performance degradation over time, 
+        user reports of app becoming sluggish after extended use, or high memory warnings. 
+        Memory leaks are often subtle - small leaks can take hours to cause visible problems.
 
-        Parameters
-        ----------
-        trace_path : str
-            Path to the Perfetto trace file.
-        process_name : str
-            Exact process name to analyze.
-        growth_threshold_mb_per_min : float, optional
-            Threshold for growth rate (MB/min) to flag potential leaks. Default: 5.0.
-        analysis_duration_ms : int, optional
-            Analyze the first N milliseconds from trace start. Default: 60,000 ms.
+        ANALYZES TWO DIMENSIONS:
+        1. Growth pattern: RSS memory trend over time
+        2. Heap suspects: Classes with excessive retained memory
 
-        Returns
-        -------
-        str
-            JSON envelope with fields:
-            - processName, tracePath, success, error, result
-            - result: {
-                growth: { avgGrowthRateMbPerMin, maxGrowthRateMbPerMin, sampleCount, leakIndicatorCount },
-                suspiciousClasses: [{ type_name, obj_count, size_mb, dominated_obj_count, dominated_size_mb }],
-                filters: { process_name, growth_threshold_mb_per_min, analysis_duration_ms },
-                notes: []
-              }
+        DETECTION CRITERIA:
+        - Sustained growth >5MB/min (default threshold)
+        - Large dominated heap sizes for specific classes
+        - Correlation between growth rate and heap suspects
 
-        Notes
-        -----
-        - Growth analysis uses process RSS samples (process_counter_track 'mem.rss').
-        - Suspicious classes require heap graph data (android.memory.heap_graph.class_aggregation).
-        - If a dataset is unavailable, the tool returns partial results and notes.
+        PARAMETERS:
+        - process_name: Target app
+        - growth_threshold_mb_per_min: Leak indicator (default 5.0)
+        - analysis_duration_ms: Time window (default 60 seconds)
+
+        OUTPUT:
+        - Growth metrics: average/max growth rate, leak indicator count
+        - Suspicious classes: Ranked by dominated size with instance counts
+        - Memory impact classification per class
+
+        COMMON LEAK PATTERNS:
+        - Bitmaps/images not recycled: Large dominated_size_mb
+        - Listener registration without unregistration: High instance_count
+        - Static collections growing unbounded: Increasing over time
+        - Context leaks: Activity/View classes in heap
+
+        LIMITATIONS: Requires heap graph data in trace. Without it, only RSS growth analysis 
+        is available. For detailed leak paths, follow up with heap_dominator_tree_analyzer.
+
+        FALSE POSITIVES: Caches and pools may show growth that stabilizes. Check if growth 
+        continues indefinitely or plateaus.
         """
         return memory_leak_tool.memory_leak_detector(
             trace_path,
@@ -455,41 +404,44 @@ def create_server() -> FastMCP:
         max_classes: int = 20,
     ) -> str:
         """
-        Analyze the heap dominator tree to identify memory-hogging classes.
+        Deep-dive into heap memory to identify specific memory-hogging classes.
 
-        WHEN TO USE: Understand which classes dominate heap usage in the latest
-        heap graph snapshot for a process. Helps pinpoint memory bloat and
-        potential leak suspects.
+        USE THIS WHEN: After memory_leak_detector finds issues, investigating high baseline 
+        memory usage, or optimizing memory footprint. This shows exactly which classes are 
+        retaining the most memory and preventing garbage collection.
 
-        Parameters
-        ----------
-        trace_path : str
-            Path to the Perfetto trace file.
-        process_name : str
-            Exact process name to analyze (matches trace data).
-        max_classes : int, optional
-            Maximum number of classes to return (1–50). Default: 20.
+        ANALYZES:
+        - Latest heap graph snapshot in trace
+        - Dominator relationships (what's keeping objects alive)
+        - Self vs native memory per class
+        - Reachability and GC root distance
 
-        Returns
-        -------
-        str
-            JSON envelope with fields:
-            - processName, tracePath, success, error, result
-            - result: {
-                totalCount,
-                classes: [{ display_name, instance_count, self_size_mb, native_size_mb,
-                            total_size_mb, avg_reachability, min_root_distance, memory_impact }...],
-                filters: { process_name, max_classes },
-                notes: []
-              }
+        OUTPUT PER CLASS:
+        - instance_count: Number of objects
+        - self_size_mb: Java heap memory
+        - native_size_mb: Native allocations
+        - total_size_mb: Combined impact
+        - memory_impact: CRITICAL (>50MB), WARNING (>20MB), NORMAL
 
-        Notes
-        -----
-        - Uses heap graph tables (heap_graph_object/class). If extended columns
-          from the dominator_tree module are unavailable, the tool falls back to
-          a simplified query (without native_size/reachability/root_distance)
-          and adds a note. If no heap graph exists in the trace, returns a
-          HEAP_GRAPH_UNAVAILABLE error.
+        KEY INSIGHTS:
+        - High instance count + low individual size = collection leak
+        - Low instance count + high size = large object problem
+        - High native_size: Bitmaps, native buffers
+        - Low root_distance: Directly referenced from GC roots
+
+        COMMON FINDINGS:
+        - Bitmap/Drawable: Image caching issues
+        - Activity/Fragment: Context leaks
+        - ArrayList/HashMap: Unbounded collections
+        - Custom classes: App-specific retention
+
+        OPTIMIZATION TARGETS: Focus on CRITICAL/WARNING classes first. A single fix can 
+        often recover tens of MBs.
+
+        REQUIREMENTS: Requires heap graph data (Debug.dumpHprofData or similar). If extended 
+        columns/modules are missing, the tool falls back to a simplified query (omits native_size, 
+        reachability, root_distance) and adds a note. If no heap graph exists, returns 
+        HEAP_GRAPH_UNAVAILABLE.
         """
         return heap_dom_tool.heap_dominator_tree_analyzer(trace_path, process_name, max_classes)
 
@@ -499,37 +451,40 @@ def create_server() -> FastMCP:
         process_name: str,
     ) -> str:
         """
-        Identify thread contention and synchronization bottlenecks for a process.
+        Find thread synchronization bottlenecks - the hidden cause of most ANRs.
 
-        WHEN TO USE: Investigate stalls due to Java monitor lock contention, especially
-        on the main thread. Highlights which threads/methods are blocking and the
-        extent of blocking.
+        USE THIS WHEN: ANRs with unclear cause, UI freezes despite low CPU usage, deadlock 
+        suspicion, or whenever performance problems don't correlate with CPU/memory metrics. 
+        This tool often reveals the true cause when other metrics look normal.
 
-        Parameters
-        ----------
-        trace_path : str
-            Path to the Perfetto trace file.
-        process_name : str
-            Exact process name to analyze.
+        CRITICAL INSIGHT: Thread contention is the #1 cause of ANRs, more common than CPU 
+        overload or memory pressure. A single poorly-placed synchronized block can freeze 
+        an entire app.
 
-        Returns
-        -------
-        str
-            JSON envelope with fields:
-            - processName, tracePath, success, error, result
-            - result: {
-                totalCount,
-                contentions: [{ blocked_thread_name, blocking_thread_name,
-                                short_blocking_method_name, contention_count,
-                                total_blocked_ms, avg_blocked_ms, max_blocked_ms,
-                                total_waiters, max_concurrent_waiters, severity }],
-                filters: { process_name }
-              }
+        DETECTS:
+        - Which threads are blocked and what's blocking them
+        - Specific methods holding locks
+        - Wait duration and frequency
+        - Concurrent waiter counts (deadlock risk indicator)
 
-        Notes
-        -----
-        - Requires android.monitor_contention module in the trace. If unavailable,
-          returns MONITOR_CONTENTION_UNAVAILABLE with details.
+        SEVERITY CLASSIFICATION:
+        - CRITICAL: Main thread blocked >100ms
+        - HIGH: Any thread blocked >500ms or frequent contention
+        - MEDIUM: Moderate blocking on worker threads
+        - LOW: Minor contention, not user-visible
+
+        COMMON ANTI-PATTERNS FOUND:
+        - Synchronized singleton access on hot paths
+        - Database locks held during network I/O
+        - SharedPreferences.commit() on main thread
+        - Nested synchronized blocks (deadlock risk)
+        - UI thread waiting for background thread locks
+
+        OUTPUT: Blocking pairs with methods, durations, and wait counts. Focus on main thread 
+        blockages first - even 50ms can cause visible jank.
+
+        FIX PRIORITY: Usually easy fixes with huge impact. Moving work outside synchronized 
+        blocks or using concurrent structures often solves the problem completely.
         """
         return thread_contention_tool.thread_contention_analyzer(
             trace_path,
@@ -544,40 +499,42 @@ def create_server() -> FastMCP:
         include_thread_states: bool = True,
     ) -> str:
         """
-        Analyze binder transaction performance and identify bottlenecks.
+        Analyze cross-process (IPC) communication performance and bottlenecks.
 
-        WHEN TO USE: Investigate cross-process call delays, especially those impacting
-        the main thread. Surfaces client/server latencies, overhead, and (optionally)
-        top thread states during each transaction.
+        USE THIS WHEN: Slow system UI interactions, input lag, delays in content providers 
+        or system services, or when ANRs involve system process communication. Binder is 
+        Android's core IPC mechanism - slow binder calls directly cause ANRs.
 
-        Parameters
-        ----------
-        trace_path : str
-            Path to the Perfetto trace file.
-        process_filter : str
-            Process name to match either as client or server process.
-        min_latency_ms : float, optional
-            Minimum client latency to include (ms). Default: 10.0.
-        include_thread_states : bool, optional
-            If true, includes aggregated top thread states per transaction. Default: True.
+        MEASURES:
+        - Client-side latency (includes waiting + server processing)
+        - Server-side processing time
+        - Overhead (client latency - server time = IPC overhead)
+        - Main thread impact (critical for ANRs)
 
-        Returns
-        -------
-        str
-            JSON envelope with fields:
-            - processName, tracePath, success, error, result
-            - result: {
-                totalCount,
-                transactions: [{ client_process, server_process, aidl_name, method_name,
-                                  client_latency_ms, server_latency_ms, overhead_ms,
-                                  is_main_thread, is_sync, top_thread_states, latency_severity }],
-                filters: { process_filter, min_latency_ms, include_thread_states }
-              }
+        PARAMETERS:
+        - process_filter: Match as client OR server
+        - min_latency_ms: Focus on slow calls (default 10ms)
+        - include_thread_states: Show what threads were doing during call
 
-        Notes
-        -----
-        - Requires android.binder module/views in the trace. If unavailable, returns
-          BINDER_DATA_UNAVAILABLE with details.
+        KEY METRICS:
+        - is_main_thread=true + latency>100ms = ANR risk
+        - High overhead = system scheduling issues
+        - Synchronous calls on main thread = architecture problem
+
+        COMMON PROBLEMATIC PATTERNS:
+        - ContentResolver queries on main thread
+        - System service calls during UI drawing
+        - Synchronous LocationManager/SensorManager calls
+        - PackageManager operations on main thread
+
+        OUTPUT: Transaction list with client/server processes, methods, latencies, and severity. 
+        Focus on main thread transactions first.
+
+        ARCHITECTURE INSIGHT: High binder latency often indicates the need to make calls 
+        asynchronous or cache results. Consider using AsyncTask, coroutines, or caching layers.
+
+        NOTE: Some system binder calls are unavoidable. Focus on reducing frequency and moving 
+        off main thread where possible.
         """
         return binder_txn_tool.binder_transaction_profiler(
             trace_path,

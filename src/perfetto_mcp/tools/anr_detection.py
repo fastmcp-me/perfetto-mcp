@@ -1,4 +1,12 @@
-"""ANR detection tool for analyzing Application Not Responding events."""
+"""ANR detection tool for analyzing Application Not Responding events.
+
+Notes:
+- Requires android.anrs data source in the trace; otherwise returns ANR_DATA_UNAVAILABLE.
+- Severity heuristic: CRITICAL if GC events near ANR > 10; HIGH if main thread state at ANR
+  indicates sleep/IO wait (S/D) or GC > 5; MEDIUM otherwise. System-critical processes are
+  escalated to at least HIGH.
+- Parameter `min_duration_ms` is currently informational and not used to filter results.
+"""
 
 import json
 import logging

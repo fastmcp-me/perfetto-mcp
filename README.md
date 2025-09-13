@@ -84,6 +84,28 @@ Analyzes the latest heap graph snapshot for a process to surface classes dominat
 Returns a JSON envelope with `result = { totalCount, classes: [{ display_name, instance_count, self_size_mb, native_size_mb, total_size_mb, avg_reachability, min_root_distance, memory_impact }], filters, notes }`.
 If extended heap graph columns or modules are missing, falls back to a simplified query (without `native_size_mb`, `avg_reachability`, `min_root_distance`) and adds a `notes` entry. If no heap graph exists in the trace, returns `HEAP_GRAPH_UNAVAILABLE`.
 
+### 10. `thread_contention_analyzer(trace_path, process_name)`
+Identifies thread contention and synchronization bottlenecks using the `android.monitor_contention` module.
+
+Returns a JSON envelope with `result = { totalCount, contentions: [...], filters }` where each row contains:
+`{ blocked_thread_name, blocking_thread_name, short_blocking_method_name, contention_count, total_blocked_ms, avg_blocked_ms, max_blocked_ms, total_waiters, max_concurrent_waiters, severity }`.
+
+Notes:
+- Requires `android.monitor_contention` data; if unavailable, returns `MONITOR_CONTENTION_UNAVAILABLE`.
+- Flags critical contentions that affect the main thread or exceed duration thresholds.
+
+### 11. `binder_transaction_profiler(trace_path, process_filter, min_latency_ms=10.0, include_thread_states=True)`
+Analyzes binder transaction performance and identifies bottlenecks using the `android.binder` module.
+
+Returns a JSON envelope with `result = { totalCount, transactions: [...], filters }` where each row contains:
+`{ client_process, server_process, aidl_name, method_name, client_latency_ms, server_latency_ms, overhead_ms, is_main_thread, is_sync, top_thread_states, latency_severity }`.
+
+Notes:
+- Requires `android.binder` views (`android_binder_txns`, `android_sync_binder_thread_state_by_txn`). If unavailable, returns `BINDER_DATA_UNAVAILABLE`.
+- Filters transactions where either client or server matches `process_filter` and client latency >= `min_latency_ms`.
+- When `include_thread_states` is true, includes the top thread states by time for each transaction.
+
+
 ## MCP Resources
 
 - `resource://perfetto-mcp/concepts`
@@ -200,23 +222,3 @@ If you see a `*_DATA_UNAVAILABLE` error, re-capture with the relevant data sourc
 - Perfetto Trace Analysis: https://perfetto.dev/docs/analysis/getting-started
 - Perfetto TraceProcessor: https://perfetto.dev/docs/analysis/trace-processor-python
 
-### 9. `thread_contention_analyzer(trace_path, process_name)`
-Identifies thread contention and synchronization bottlenecks using the `android.monitor_contention` module.
-
-Returns a JSON envelope with `result = { totalCount, contentions: [...], filters }` where each row contains:
-`{ blocked_thread_name, blocking_thread_name, short_blocking_method_name, contention_count, total_blocked_ms, avg_blocked_ms, max_blocked_ms, total_waiters, max_concurrent_waiters, severity }`.
-
-Notes:
-- Requires `android.monitor_contention` data; if unavailable, returns `MONITOR_CONTENTION_UNAVAILABLE`.
-- Flags critical contentions that affect the main thread or exceed duration thresholds.
-
-### 10. `binder_transaction_profiler(trace_path, process_filter, min_latency_ms=10.0, include_thread_states=True)`
-Analyzes binder transaction performance and identifies bottlenecks using the `android.binder` module.
-
-Returns a JSON envelope with `result = { totalCount, transactions: [...], filters }` where each row contains:
-`{ client_process, server_process, aidl_name, method_name, client_latency_ms, server_latency_ms, overhead_ms, is_main_thread, is_sync, top_thread_states, latency_severity }`.
-
-Notes:
-- Requires `android.binder` views (`android_binder_txns`, `android_sync_binder_thread_state_by_txn`). If unavailable, returns `BINDER_DATA_UNAVAILABLE`.
-- Filters transactions where either client or server matches `process_filter` and client latency >= `min_latency_ms`.
-- When `include_thread_states` is true, includes the top thread states by time for each transaction.
