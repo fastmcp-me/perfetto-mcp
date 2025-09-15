@@ -85,13 +85,15 @@ Returns a JSON envelope with `result = { totalCount, classes: [{ display_name, i
 If extended heap graph columns or modules are missing, falls back to a simplified query (without `native_size_mb`, `avg_reachability`, `min_root_distance`) and adds a `notes` entry. If no heap graph exists in the trace, returns `HEAP_GRAPH_UNAVAILABLE`.
 
 ### 10. `thread_contention_analyzer(trace_path, process_name)`
-Identifies thread contention and synchronization bottlenecks using the `android.monitor_contention` module.
+Identifies thread contention and synchronization bottlenecks with automatic fallback.
 
-Returns a JSON envelope with `result = { totalCount, contentions: [...], filters }` where each row contains:
+Returns a JSON envelope with `result = { totalCount, contentions: [...], filters, analysisSource, usesWakerLinkage?, usedSchedBlockedReason?, primaryDataUnavailable?, fallbackNotice? }` where each row contains:
 `{ blocked_thread_name, blocking_thread_name, short_blocking_method_name, contention_count, total_blocked_ms, avg_blocked_ms, max_blocked_ms, total_waiters, max_concurrent_waiters, severity }`.
 
 Notes:
-- Requires `android.monitor_contention` data; if unavailable, returns `MONITOR_CONTENTION_UNAVAILABLE`.
+- **Primary analysis**: Uses `android.monitor_contention` data when available for precise Java lock details.
+- **Automatic fallback**: Falls back to scheduler-based inference when monitor contention data is unavailable.
+- **Metadata fields**: Includes `analysisSource`, `usesWakerLinkage`, `usedSchedBlockedReason`, `primaryDataUnavailable`, and `fallbackNotice` for transparency.
 - Flags critical contentions that affect the main thread or exceed duration thresholds.
 
 ### 11. `binder_transaction_profiler(trace_path, process_filter, min_latency_ms=10.0, include_thread_states=True)`
@@ -177,7 +179,7 @@ Examples:
 - anr_root_cause_analyzer → `result = { window, filters, mainThreadBlocks, binderDelays, memoryPressure, lockContention, insights, notes }`
 - cpu_utilization_profiler → `result = { processName, groupBy, summary, threads, frequency }`
 - detect_jank_frames → `result = { totalCount, frames: [...], filters }`
-- thread_contention_analyzer → `result = { totalCount, contentions: [...], filters }`
+- thread_contention_analyzer → `result = { totalCount, contentions: [...], filters, analysisSource, usesWakerLinkage?, usedSchedBlockedReason?, primaryDataUnavailable?, fallbackNotice? }`
 
 ## Dependencies
 
@@ -209,8 +211,9 @@ Example tool calls (high level):
 ## Data Prerequisites & Troubleshooting
 
 - `detect_anrs`/`anr_root_cause_analyzer`: Require Android system traces with ANR data. If the ANR module/tables are absent, the tool returns an informative error.
-- `detect_jank_frames`: Requires Android frame timeline data (Android S+). If standard library views are missing, the tool falls back to raw frame tables. If even those are absent, you likely didn’t enable frame timeline in the trace config.
+- `detect_jank_frames`: Requires Android frame timeline data (Android S+). If standard library views are missing, the tool falls back to raw frame tables. If even those are absent, you likely didn't enable frame timeline in the trace config.
 - `cpu_utilization_profiler`: Requires scheduler data (ftrace sched events) to compute per-thread runtime and scheduling stats.
+- `thread_contention_analyzer`: Prefers `android.monitor_contention` data for precise Java lock details, but automatically falls back to scheduler-based inference if unavailable.
 
 If you see a `*_DATA_UNAVAILABLE` error, re-capture with the relevant data sources enabled or provide a different trace.
 

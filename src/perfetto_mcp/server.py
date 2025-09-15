@@ -451,27 +451,40 @@ def create_server() -> FastMCP:
         process_name: str,
     ) -> str:
         """
-        Find thread synchronization bottlenecks - the hidden cause of most ANRs.
+        Find thread synchronization bottlenecks with automatic fallback analysis  - the hidden cause of most ANRs.
 
-        USE THIS WHEN: ANRs with unclear cause, UI freezes despite low CPU usage, deadlock 
-        suspicion, or whenever performance problems don't correlate with CPU/memory metrics. 
+        USE THIS WHEN: ANRs with unclear cause, UI freezes despite low CPU usage, deadlock
+        suspicion, or whenever performance problems don't correlate with CPU/memory metrics.
         This tool often reveals the true cause when other metrics look normal.
 
-        CRITICAL INSIGHT: Thread contention is the #1 cause of ANRs, more common than CPU 
-        overload or memory pressure. A single poorly-placed synchronized block can freeze 
+        CRITICAL INSIGHT: Thread contention is the #1 cause of ANRs, more common than CPU
+        overload or memory pressure. A single poorly-placed synchronized block can freeze
         an entire app.
+
+        ANALYSIS MODES:
+        - PRIMARY: Uses android.monitor_contention data when available for precise Java lock details
+        - FALLBACK: Automatically falls back to scheduler-based inference using thread_state,
+          sched_waking, and optionally sched_blocked_reason tables when monitor contention is missing
 
         DETECTS:
         - Which threads are blocked and what's blocking them
-        - Specific methods holding locks
+        - Specific methods holding locks (when available)
         - Wait duration and frequency
         - Concurrent waiter counts (deadlock risk indicator)
+        - D-state blocking attribution via sched_blocked_reason (when available)
 
         SEVERITY CLASSIFICATION:
         - CRITICAL: Main thread blocked >100ms
         - HIGH: Any thread blocked >500ms or frequent contention
         - MEDIUM: Moderate blocking on worker threads
         - LOW: Minor contention, not user-visible
+
+        OUTPUT METADATA:
+        - analysisSource: "monitor_contention" (primary) or "scheduler_inferred" (fallback)
+        - usesWakerLinkage: true if waker-thread relationships were available
+        - usedSchedBlockedReason: true if D-state function attribution was available
+        - primaryDataUnavailable: true when fallback was used
+        - fallbackNotice: human-readable explanation when fallback was triggered
 
         COMMON ANTI-PATTERNS FOUND:
         - Synchronized singleton access on hot paths
@@ -480,10 +493,12 @@ def create_server() -> FastMCP:
         - Nested synchronized blocks (deadlock risk)
         - UI thread waiting for background thread locks
 
-        OUTPUT: Blocking pairs with methods, durations, and wait counts. Focus on main thread 
-        blockages first - even 50ms can cause visible jank.
+        RECOMMENDED TRACE CONFIGS:
+        - Primary: Include android.monitor_contention data source
+        - Fallback: Include linux.ftrace with sched/sched_switch, sched/sched_waking,
+          and optionally sched/sched_blocked_reason events
 
-        FIX PRIORITY: Usually easy fixes with huge impact. Moving work outside synchronized 
+        FIX PRIORITY: Usually easy fixes with huge impact. Moving work outside synchronized
         blocks or using concurrent structures often solves the problem completely.
         """
         return thread_contention_tool.thread_contention_analyzer(
