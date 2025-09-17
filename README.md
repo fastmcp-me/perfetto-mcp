@@ -1,254 +1,111 @@
-# Perfetto MCP Server
-
-A Model Context Protocol (MCP) server that provides tools for analyzing Perfetto trace files with persistent connection management and automatic reconnection support.
-
-## Features
-
-- **Persistent Connections**: Maintains trace connections across multiple tool calls for improved performance
-- **Automatic Reconnection**: Handles connection failures gracefully with automatic retry logic
-- **Modular Architecture**: Clean separation of concerns with dedicated modules for different functionalities
-- **Thread-Safe**: Safe for concurrent tool calls with proper locking mechanisms
-
-## Architecture
-
-The server is organized into a modular structure:
-
-```
-src/perfetto_mcp/
-├── __init__.py              # Package initialization
-├── server.py                # Main MCP server setup with lifecycle management
-├── connection_manager.py    # Persistent TraceProcessor connection management
-├── resource/                # MCP resources registration
-│   ├── __init__.py          # register_resources(mcp)
-│   ├── concepts.py          # concepts markdown as FileResource
-│   └── trace_analysis.py    # trace analysis URL resource
-├── tools/
-│   ├── __init__.py
-│   ├── base.py              # Base tool class with connection management and unified formatting
-│   ├── find_slices.py       # find_slices tool
-│   ├── sql_query.py         # execute_sql_query tool
-│   ├── anr_detection.py     # detect_anrs tool
-│   ├── anr_root_cause.py    # anr_root_cause_analyzer tool
-│   ├── cpu_utilization.py   # cpu_utilization_profiler tool
-│   ├── jank_frames.py       # detect_jank_frames tool
-│   └── frame_performance_summary.py  # frame_performance_summary tool
-└── utils/
-    ├── __init__.py
-    └── query_helpers.py     # SQL query utilities and validation
-```
-
-### Key Components
-
-- **ConnectionManager**: Manages persistent TraceProcessor connections with automatic switching and reconnection
-- **BaseTool**: Base class providing connection management and error handling for all tools
-- **Server Lifecycle**: Proper cleanup handlers for graceful shutdown and connection management
-
-## Available Tools
-
-### 1. `find_slices(trace_path, pattern, process_name=None, match_mode='contains', limit=100, main_thread_only=False, time_range=None)`
-Discover slices by flexible name matching and return aggregates plus examples without writing SQL.
-Returns a JSON envelope with `result = { matchMode, filters, timeRangeMs, aggregates: [...], examples: [...], notes }`.
-
-### 2. `execute_sql_query(trace_path, sql_query, process_name=None)`
-Execute PerfettoSQL scripts (multi-statement) against the trace database. The script is executed
-verbatim by TraceProcessor. If the final statement is a `SELECT`, rows are returned; otherwise,
-the result has `rowCount = 0` and `columns = []`.
-
-Notes:
-- Supports full PerfettoSQL, including `INCLUDE PERFETTO MODULE` (wildcards allowed where supported),
-  `CREATE PERFETTO TABLE/VIEW/INDEX/MACRO/FUNCTION`, and standard SQLite statements (e.g., `PRAGMA`).
-- No automatic `LIMIT` is applied. Consider adding `LIMIT` to avoid large result sets.
-- Guardrails: the server enforces basic caps (script size and optional statement count). Scripts are
-  otherwise passed through without keyword blocking.
-
-### 3. `detect_anrs(trace_path, process_name=None, min_duration_ms=5000, time_range=None)`
-Detect Application Not Responding (ANR) events in Android traces with contextual details and severity analysis.
-
-### 4. `anr_root_cause_analyzer(trace_path, process_name=None, anr_timestamp_ms=None, analysis_window_ms=10000, time_range=None, deep_analysis=False)`
-Analyze likely ANR root causes by correlating multiple signals within a time window (main thread blocking, slow Binder transactions, memory pressure, Java monitor contention). Returns a structured envelope with an insights section and per-signal details.
-
-### 5. `cpu_utilization_profiler(trace_path, process_name, group_by='thread', include_frequency_analysis=True)`
-Profile CPU utilization for a process with a per-thread breakdown (runtime, scheduling stats, CPU percent). Optionally includes CPU frequency (DVFS) summary when available.
-
-### 6. `detect_jank_frames(trace_path, process_name, jank_threshold_ms=16.67, severity_filter=None)`
-Identify janky frames for a process with severity and source classification (Application vs SurfaceFlinger), including overrun, CPU/UI time, and layer name.
-Returns a JSON envelope with `result = { totalCount, frames: [...], filters }` where each frame row contains:
-`{ frame_id, timestamp_ms, duration_ms, overrun_ms, jank_type, jank_severity_type, jank_source, cpu_time_ms, ui_time_ms, layer_name, jank_classification }`.
-
-Notes for `detect_jank_frames`:
-- Requires Android frame timeline data. The tool first uses standard library modules (`android.frames.timeline`, `android.frames.per_frame_metrics`).
-- If those are missing, it falls back to raw `actual_frame_timeline_slice`/`expected_frame_timeline_slice` tables and computes `overrun_ms` without CPU/UI time (returned as null) to remain useful on leaner traces.
+<div align="center"><b>Perfetto MCP</b></div>
+
+Get answers from your traces. Perfetto MCP turns natural‑language prompts into focused Perfetto analyses so you can quickly explain jank, diagnose ANRs, spot CPU hot threads, uncover lock contention, and find memory leaks — without writing SQL. Point it at a trace and process, ask a question, and receive concise, actionable summaries with structured results you can drill into.
+
+## Prerequisites
+
+- Python 3.13+ installed on your system (python.org, Homebrew, or your distro package manager)
+
+## Getting Started
+
+Installation instructions coming soon.
 
-### 7. `frame_performance_summary(trace_path, process_name)`
-Aggregated frame performance metrics and jank statistics for a process.
-Returns a JSON envelope with `result = { total_frames, jank_frames, jank_rate_percent, slow_frames, big_jank_frames, huge_jank_frames, avg_cpu_time_ms, max_cpu_time_ms, p95_cpu_time_ms, p99_cpu_time_ms, performance_rating }`.
-Requires per-frame metrics; if unavailable, returns a `FRAME_METRICS_UNAVAILABLE` error with details.
-
-### 8. `memory_leak_detector(trace_path, process_name, growth_threshold_mb_per_min=5.0, analysis_duration_ms=60000)`
-Detects memory leaks using process RSS growth patterns and heap graph aggregation.
-Returns a JSON envelope with `result = { growth: { avgGrowthRateMbPerMin, maxGrowthRateMbPerMin, sampleCount, leakIndicatorCount }, suspiciousClasses: [{ type_name, obj_count, size_mb, dominated_obj_count, dominated_size_mb }], filters, notes }`.
-If RSS or heap graph data are unavailable, returns partial results with `notes` explaining what’s missing.
-
-### 9. `heap_dominator_tree_analyzer(trace_path, process_name, max_classes=20)`
-Analyzes the latest heap graph snapshot for a process to surface classes dominating heap usage.
-Returns a JSON envelope with `result = { totalCount, classes: [{ display_name, instance_count, self_size_mb, native_size_mb, total_size_mb, avg_reachability, min_root_distance, memory_impact }], filters, notes }`.
-If extended heap graph columns or modules are missing, falls back to a simplified query (without `native_size_mb`, `avg_reachability`, `min_root_distance`) and adds a `notes` entry. If no heap graph exists in the trace, returns `HEAP_GRAPH_UNAVAILABLE`.
-
-### 10. `thread_contention_analyzer(trace_path, process_name, time_range=None, min_block_ms=50.0, include_per_thread_breakdown=False, include_examples=False, limit=80)`
-Identifies thread contention and synchronization bottlenecks with time scoping, minimum-duration filtering, optional per-thread blocked-state breakdown, example waits, and automatic fallback when monitor contention data is unavailable.
-
-Returns a JSON envelope with `result = { totalCount, contentions: [...], filters, analysisSource, usesWakerLinkage?, usedSchedBlockedReason?, primaryDataUnavailable?, fallbackNotice?, timeRangeMs?, thresholds, dataDependencies, notes?, blocked_state_breakdown?, top_dstate_functions?, examples? }` where each contention row contains:
-`{ blocked_thread_name, blocking_thread_name, short_blocking_method_name, contention_count, total_blocked_ms, avg_blocked_ms, max_blocked_ms, total_waiters, max_concurrent_waiters, blocked_is_main_thread?, severity }`.
+## How to use?
 
-Notes:
-- **Primary analysis**: Uses `android.monitor_contention` when available; `min_block_ms` filters out short waits before aggregation; `time_range` restricts to the window.
-- **Automatic fallback**: Infers from `thread_state` with waker linkage and optional `sched_blocked_reason` attribution; same `time_range` and thresholding.
-- **Breakdown**: If `include_per_thread_breakdown=True`, returns per-thread S/D totals and percentages for the same window.
-- **Examples**: If `include_examples=True`, returns the longest waits (from primary or fallback path) capped by `limit`.
+Most tools require:
+- **trace_path**: Absolute path to your Perfetto trace file (e.g., `.pftrace`, `.perfetto-trace`).
+- **process_name**: Target process/app name (exact or wildcard where supported, e.g., `com.example.app`).
 
-### 11. `binder_transaction_profiler(trace_path, process_filter, min_latency_ms=10.0, include_thread_states=True, time_range=None, correlate_with_main_thread=False, group_by=None)`
-Analyzes binder transaction performance and identifies bottlenecks using the `android.binder` module.
+In your prompt, mention the trace and process explicitly so the assistant can route calls correctly. For example:
+- “Use trace `/absolute/path/to/trace.pftrace` for process `com.example.app`.”
 
-Returns a JSON envelope with results depending on `group_by`:
-- When `group_by=None`: `result = { totalCount, timeRangeMs?, transactions: [...], filters }` where each row contains:
-  `{ client_process, server_process, aidl_name, method_name, client_latency_ms, server_latency_ms, overhead_ms, overhead_ratio, is_main_thread, is_sync, top_thread_states, main_thread_top_states?, latency_severity }`.
-- When grouped (`'aidl'` or `'server_process'`): `result = { totalCount, timeRangeMs?, aggregates: [...], filters }` with aggregated counts and average latencies/overheads.
+Optional filters supported by many tools:
+- **time_range**: Limit analysis to a window, e.g., `{start_ms: 10000, end_ms: 25000}`.
+- Tool‑specific thresholds (e.g., `min_block_ms`, `jank_threshold_ms`, `limit`).
 
-Parameters:
-- `time_range`: Optional `{'start_ms': X, 'end_ms': Y}` to scope the analysis window by client timestamp.
-- `correlate_with_main_thread`: If true, adds a best‑effort summary of client main-thread states for main-thread transactions.
-- `group_by`: One of `None`, `'aidl'`, `'server_process'` to switch to aggregated views.
+## Tools
 
-Notes:
-- Requires `android.binder` views (`android_binder_txns`, `android_sync_binder_thread_state_by_txn`). If unavailable, returns `BINDER_DATA_UNAVAILABLE`.
-- Filters transactions where either client or server matches `process_filter` and client latency >= `min_latency_ms`.
-- When `include_thread_states` is true, includes the top thread states by time for each transaction.
+Below are the available tools, how they help, and what to expect in the result. Each tool returns a concise JSON envelope with a tool‑specific `result` payload.
 
+### find_slices
+- **What it does**: Scans slice names using contains/exact/glob matching, filters by process, main thread, and time window, then surfaces per‑name duration stats and the heaviest example slices with track/thread context. Great for quickly mapping an unfamiliar trace and pinpointing hot paths.
+- **Useful for**: Exploring unfamiliar traces, locating hot paths, scoping by process/main thread/time window.
+- **Examples**: "On `/abs/trace.pftrace` for `com.example.app`, survey slice names containing 'Choreographer' and show top examples." "Using `/abs/trace.pftrace` for `com.example.app`, list main‑thread hotspots matching glob `input*` within 10s–25s."
+- **Output**: Aggregates with count/duration stats and example slices (ids, timestamps, durations, track context), plus notes on any fallbacks.
 
-## MCP Resources
+### execute_sql_query
+- **What it does**: Executes multi‑statement PerfettoSQL scripts verbatim against the trace database, including optional standard‑library modules. Ideal when you need bespoke metrics, custom joins, or correlations beyond prebuilt tools.
+- **Useful for**: Custom analyses that go beyond the prebuilt tools.
+- **Examples**: "Run a custom PerfettoSQL analysis on `/abs/trace.pftrace` for `com.example.app` to correlate threads and frames in the first 30s." "On `/abs/trace.pftrace` for `com.example.app`, execute a custom query to compare runtime across worker threads."
+- **Output**: Columns, rows, rowCount, and basic metadata about the script execution.
 
-- `resource://perfetto-mcp/concepts`
-  - Text/Markdown reference for Perfetto analysis concepts and workflows
-  - Backed by: `docs/Perfetto-MCP-Concepts.md`
-  - MIME: `text/markdown`
-  - Discover via `list_resources`, read via `read_resource`
+### detect_anrs
+- **What it does**: Detects Application Not Responding (ANR) events and augments each with timing, process context, last‑known main‑thread state, and GC pressure near the event. Applies a simple severity heuristic so you can triage quickly.
+- **Useful for**: Investigating app freezes and unresponsive periods.
+- **Examples**: "On `/abs/trace.pftrace`, detect ANRs for `com.example.app` in the first 60s and summarize severity." "Check if there's an ANR around 20s for `com.example.app` on `/abs/trace.pftrace` and show main‑thread state."
+- **Output**: ANR list with timestamps, process info, main‑thread state, GC pressure indicators, and severity classification.
 
-- `resource://perfetto-docs/trace-analysis-getting-started`
-  - URL resource pointing to official Perfetto trace analysis documentation
-  - References: `https://perfetto.dev/docs/analysis/getting-started`
-  - MIME: `text/markdown`
-  - Provides context for using MCP tools with official Perfetto workflow guidance
+### anr_root_cause_analyzer
+- **What it does**: Correlates main‑thread blocking states, slow Binder transactions, memory pressure, and Java monitor contention within a focused window around an ANR or timestamp. Ranks likely causes with clear rationale and highlights missing data when applicable.
+- **Useful for**: Pinpointing likely ANR causes and prioritizing fixes.
+- **Examples**: "For `/abs/trace.pftrace` and `com.example.app`, analyze root cause around 20,000 ms and rank likely causes." "On `/abs/trace.pftrace`, deep‑analyze the ANR at 35s for `com.example.app` and correlate locks, GC, and Binder."
+- **Output**: Ranked likely causes with rationale, plus detailed per‑signal findings and notes on data availability.
 
-## Development Commands
+### cpu_utilization_profiler
+- **What it does**: Aggregates per‑thread runtime from scheduler data to compute CPU% of the selected window, scheduling counts, and typical vs worst run‑slice lengths. Flags main‑thread overload and summarizes CPU frequency/boost behavior when available.
+- **Useful for**: Identifying CPU‑bound hotspots, thread thrashing, and main‑thread overload.
+- **Examples**: "Profile CPU usage by thread for `com.example.app` on `/abs/trace.pftrace` and flag the hottest threads." "On `/abs/trace.pftrace`, show per‑thread CPU% for `com.example.app` during 10s–40s."
+- **Output**: Per‑thread CPU %, runtime totals, scheduling counts, average/max slice times, and DVFS insights when available.
 
-**Setup and Dependencies:**
-- `uv sync` - Install dependencies and create virtual environment
-- `uv add <package>` - Add new dependency
+### detect_jank_frames
+- **What it does**: Uses frame‑timeline data to identify frames that miss their deadline, classifies severity, and attributes the source (application vs SurfaceFlinger). Includes per‑frame CPU/UI time when present and supports threshold/severity filtering.
+- **Useful for**: Diagnosing UI stutters and prioritizing the worst frames.
+- **Examples**: "Find janky frames for `com.example.app` in `/abs/trace.pftrace` above 16.67 ms and list the worst 20." "Focus on severe jank frames near 22s for `com.example.app` on `/abs/trace.pftrace` and classify the source."
+- **Output**: Frame rows with timestamps, durations, deadline overrun, jank type/severity/source, CPU/UI time (when available), and classification.
 
-**Running the Server:**
-- `uv run mcp dev main.py` - Run MCP server with development tooling
-- `uv run python main.py` - Run MCP server directly
+### frame_performance_summary
+- **What it does**: Summarizes overall frame health with jank rate and category counts, plus CPU‑time distribution (avg/max/P95/P99). Delivers a simple rating so you can baseline and compare builds or scenarios.
+- **Useful for**: Establishing baselines and comparing before/after optimizations.
+- **Examples**: "Summarize frame performance for `com.example.app` in `/abs/trace.pftrace` and report jank rate and P99 CPU time."
+- **Output**: Totals, jank rate, frame category counts (slow/jank/big/huge), CPU time distribution (avg/max/P95/P99), and a performance rating.
 
-**Testing:**
-- `uv run pytest -q` - Run test suite (when tests are added)
+### memory_leak_detector
+- **What it does**: Analyzes process RSS over time for sustained growth patterns and, when heap data exists, aggregates classes dominating retained memory. Correlates growth with suspects to prioritize likely leaks quickly.
+- **Useful for**: Investigating OOMs and gradual performance degradation over long sessions.
+- **Examples**: "Detect memory‑leak signals for `com.example.app` on `/abs/trace.pftrace` over the last 60s."
+- **Output**: Growth metrics (avg/max, leak indicators) and suspicious classes with sizes/instance counts; notes when data is partial.
 
-## Connection Management
+### heap_dominator_tree_analyzer
+- **What it does**: Builds a dominator‑style view of the latest heap snapshot to surface classes retaining the most memory, breaking down Java vs native where available and estimating reachability characteristics.
+- **Useful for**: Finding memory‑hogging types, native allocations, and GC root proximity.
+- **Examples**: "From `/abs/trace.pftrace`, analyze heap dominator classes for `com.example.app` and list the top offenders."
+- **Output**: Top classes with instance counts and memory breakdown (self/native/total), reachability indicators when available, and impact tiers.
 
-The server implements intelligent connection management:
+### thread_contention_analyzer
+- **What it does**: Detects synchronization bottlenecks by analyzing Java monitor contention (primary) or inferring blocking from scheduler states with waker linkage (fallback). Groups by blocked/holding threads, quantifies duration/occurrence, and can include per‑thread blocked‑state breakdown and concrete examples.
+- **Useful for**: Explaining freezes with low CPU usage, diagnosing ANRs due to locks.
+- **Examples**: "On `/abs/trace.pftrace`, find lock contention affecting `com.example.app` between 15s–30s and show the worst waits." "Explain if the main thread of `com.example.app` is blocked by another thread around 20s on `/abs/trace.pftrace`."
+- **Output**: Contentions grouped by blocked/holding threads with duration stats, severity, optional per‑thread blocked‑state breakdown, and example waits.
 
-- **Persistent Connections**: Connections remain open between tool calls for the same trace file
-- **Automatic Switching**: Seamlessly switches connections when a different trace path is provided
-- **Reconnection**: Automatically reconnects on connection failures without losing context
-- **Cleanup**: Proper connection cleanup on server shutdown via multiple mechanisms
+### binder_transaction_profiler
+- **What it does**: Profiles Binder IPC performance by decomposing client‑side latency, server processing time, and overhead, identifying main‑thread synchronous calls and slow system interactions. Supports grouping by AIDL or server process.
+- **Useful for**: Uncovering slow system service interactions that contribute to ANRs or jank.
+- **Examples**: "Profile slow Binder transactions involving `com.example.app` on `/abs/trace.pftrace` and group by server process." "On `/abs/trace.pftrace`, list main‑thread synchronous Binder calls >100 ms for `com.example.app`."
+- **Output**: Transaction rows or aggregates with client/server latencies, overhead, main‑thread impact, and top thread states.
 
-## Error Handling
+### main_thread_hotspot_slices
+- **What it does**: Enumerates the longest‑running main‑thread slices for the target process using the explicit main‑thread flag when available or a safe heuristic otherwise. Highlights heavy callbacks and phases for rapid ANR/jank triage.
+- **Useful for**: Fast ANR/jank triage to reveal heavy callbacks and phases.
+- **Examples**: "List the longest‑running main‑thread slices for `com.example.app` using `/abs/trace.pftrace` and include timestamps." "On `/abs/trace.pftrace`, show main‑thread hotspots >50 ms for `com.example.app` during 10s–25s."
+- **Output**: Hotspots with ids, timestamps, durations, thread/track context, plus summary and notes on any heuristics used.
 
-The server maintains backward compatibility with the original error handling while adding new features:
+## Resource
 
-- **FileNotFoundError**: Invalid trace file paths
-- **ConnectionError**: TraceProcessor connection issues
-- **Automatic Recovery**: Attempts reconnection on connection failures
-- **Graceful Degradation**: Falls back to error messages when reconnection fails
+- Perfetto Trace Processor: [Trace Processor Python API](https://perfetto.dev/docs/analysis/trace-processor-python)
+- Perfetto SQL: [Perfetto SQL syntax](https://perfetto.dev/docs/analysis/perfetto-sql-syntax)
 
-## Safety Features
+## License
 
-- **SQL Validation**: Only SELECT queries are allowed for security
-- **Query Sanitization**: Basic validation to prevent dangerous operations
+This project is licensed under the terms described in the `LICENSE` file.
 
-## Tool Output Schema
-
-All tool calls return a consistent JSON envelope:
-
-```
-{
-  "processName": "not-specified" | "<provided by caller>",
-  "tracePath": "./trace.pftrace",
-  "success": true,
-  "error": null | { "code": "...", "message": "...", "details": "..." },
-  "result": { ... tool-specific payload ... }
-}
-```
-
-Examples:
-- find_slices → `result = { matchMode, filters, timeRangeMs, aggregates, examples, notes }`
-- execute_sql_query → `result = { query, columns, rows, rowCount, scriptStatementCount?, lastStatementType?, returnsRows }`
-- detect_anrs → `result = { totalCount, anrs: [...], filters: { ... } }`
-- anr_root_cause_analyzer → `result = { window, filters, mainThreadBlocks, binderDelays, memoryPressure, lockContention, insights, notes }`
-- cpu_utilization_profiler → `result = { processName, groupBy, summary, threads, frequency }`
-- detect_jank_frames → `result = { totalCount, frames: [...], filters }`
-- thread_contention_analyzer → `result = { totalCount, contentions: [...], filters, analysisSource, usesWakerLinkage?, usedSchedBlockedReason?, primaryDataUnavailable?, fallbackNotice? }`
-
-## Dependencies
-
-- Requires Python >=3.13
-- Key packages: `mcp[cli]`, `perfetto`, `protobuf<5`
-
-## Shutdown Handling
-
-The server implements multiple cleanup strategies:
-- Primary: `atexit` handlers for normal shutdown
-- Secondary: Signal handlers for SIGTERM/SIGINT
-- Graceful: Proper connection cleanup in all scenarios
-
-
-## Usage Examples
-
-Run the server (stdio):
-- `uv run mcp dev main.py` (with dev tooling), or
-- `uv run python main.py`
-
-Example tool calls (high level):
-- `find_slices`: Provide `trace_path` and a `pattern` (default contains) to survey matching slices with stats and top examples.
-- `execute_sql_query`: Provide a SELECT query. Dangerous statements are rejected.
-- `detect_anrs`: Optionally filter by `process_name`, `min_duration_ms`, and a `{start_ms, end_ms}` window.
-- `anr_root_cause_analyzer`: Provide the process and either an `anr_timestamp_ms` with an `analysis_window_ms` or an explicit `time_range`.
-- `cpu_utilization_profiler`: Provide `process_name`; returns per-thread CPU usage breakdown. Optionally includes frequency analysis.
-- `detect_jank_frames`: Provide `process_name`; optionally tune `jank_threshold_ms` and `severity_filter`.
-
-### 12. `main_thread_hotspot_slices(trace_path, process_name, limit=80, time_range=None, min_duration_ms=None)`
-Identify the longest-running slices on the main thread for a target process. Useful for ANR and jank triage.
-
-Returns a JSON envelope with `result = { filters, timeRangeMs, dataDependencies, hotspots: [...], summary, notes }` where each hotspot row contains:
-`{ sliceId, name, category, depth, trackId, trackName, tsMs, endTsMs, durMs, threadName, tid, isMainThread, processName, pid }`.
-
-Notes:
-- Filters by `thread.is_main_thread = 1` when available; otherwise falls back to heuristic `tid == pid` and reports this in `notes`.
-- Supports `process_name` GLOB (e.g., `com.example.*`), optional `time_range = {start_ms, end_ms}`, and `min_duration_ms` threshold.
-
-## Data Prerequisites & Troubleshooting
-
-- `detect_anrs`/`anr_root_cause_analyzer`: Require Android system traces with ANR data. If the ANR module/tables are absent, the tool returns an informative error.
-- `detect_jank_frames`: Requires Android frame timeline data (Android S+). If standard library views are missing, the tool falls back to raw frame tables. If even those are absent, you likely didn't enable frame timeline in the trace config.
-- `cpu_utilization_profiler`: Requires scheduler data (ftrace sched events) to compute per-thread runtime and scheduling stats.
-- `thread_contention_analyzer`: Prefers `android.monitor_contention` data for precise Java lock details, but automatically falls back to scheduler-based inference if unavailable.
-
-If you see a `*_DATA_UNAVAILABLE` error, re-capture with the relevant data sources enabled or provide a different trace.
-
-
-## Reference Documents
-
-- MCP Server: https://modelcontextprotocol.io/quickstart/server
-- Python MCP SDK: https://github.com/modelcontextprotocol/python-sdk
-- Perfetto Trace Analysis: https://perfetto.dev/docs/analysis/getting-started
-- Perfetto TraceProcessor: https://perfetto.dev/docs/analysis/trace-processor-python
 
