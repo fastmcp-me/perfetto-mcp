@@ -16,6 +16,7 @@ from .tools.memory_leak_detector import MemoryLeakDetectorTool
 from .tools.heap_dominator_tree_analyzer import HeapDominatorTreeAnalyzerTool
 from .tools.thread_contention_analyzer import ThreadContentionAnalyzerTool
 from .tools.binder_transaction_profiler import BinderTransactionProfilerTool
+from .tools.main_thread_hotspots import MainThreadHotspotTool
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -46,6 +47,7 @@ def create_server() -> FastMCP:
     heap_dom_tool = HeapDominatorTreeAnalyzerTool(connection_manager)
     thread_contention_tool = ThreadContentionAnalyzerTool(connection_manager)
     binder_txn_tool = BinderTransactionProfilerTool(connection_manager)
+    main_thread_hotspot_tool = MainThreadHotspotTool(connection_manager)
 
 
     @mcp.tool()
@@ -569,6 +571,39 @@ def create_server() -> FastMCP:
             process_filter,
             min_latency_ms,
             include_thread_states,
+        )
+
+    @mcp.tool()
+    def main_thread_hotspot_slices(
+        trace_path: str,
+        process_name: str,
+        limit: int = 80,
+        time_range: dict | None = None,
+        min_duration_ms: float | int | None = None,
+    ) -> str:
+        """
+        Identify the heaviest main-thread slices for a process, ordered by duration.
+
+        USE THIS WHEN: You need the fastest view into what the UI thread is spending time on.
+        This is ideal for ANR and jank triage, highlighting long-running callbacks and phases.
+
+        PARAMETERS:
+        - process_name: Target app/process (supports GLOB like "com.example.*").
+        - time_range: {'start_ms': X, 'end_ms': Y} to focus on specific periods.
+        - limit: Max number of slices to return (default 80).
+        - min_duration_ms: Only include slices >= threshold.
+
+        OUTPUT:
+        - hotspots: Top slices with ids, timestamps, durations, and context (thread/process/track).
+        - summary: Totals and whether main-thread flag or heuristic was used.
+        - notes: Data availability and fallback information.
+        """
+        return main_thread_hotspot_tool.main_thread_hotspot_slices(
+            trace_path,
+            process_name,
+            limit,
+            time_range,
+            min_duration_ms,
         )
 
     # Setup cleanup using atexit

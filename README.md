@@ -209,6 +209,16 @@ Example tool calls (high level):
 - `cpu_utilization_profiler`: Provide `process_name`; returns per-thread CPU usage breakdown. Optionally includes frequency analysis.
 - `detect_jank_frames`: Provide `process_name`; optionally tune `jank_threshold_ms` and `severity_filter`.
 
+### 12. `main_thread_hotspot_slices(trace_path, process_name, limit=80, time_range=None, min_duration_ms=None)`
+Identify the longest-running slices on the main thread for a target process. Useful for ANR and jank triage.
+
+Returns a JSON envelope with `result = { filters, timeRangeMs, dataDependencies, hotspots: [...], summary, notes }` where each hotspot row contains:
+`{ sliceId, name, category, depth, trackId, trackName, tsMs, endTsMs, durMs, threadName, tid, isMainThread, processName, pid }`.
+
+Notes:
+- Filters by `thread.is_main_thread = 1` when available; otherwise falls back to heuristic `tid == pid` and reports this in `notes`.
+- Supports `process_name` GLOB (e.g., `com.example.*`), optional `time_range = {start_ms, end_ms}`, and `min_duration_ms` threshold.
+
 ## Data Prerequisites & Troubleshooting
 
 - `detect_anrs`/`anr_root_cause_analyzer`: Require Android system traces with ANR data. If the ANR module/tables are absent, the tool returns an informative error.

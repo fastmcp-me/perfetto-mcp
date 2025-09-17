@@ -12,6 +12,7 @@ from .frame_performance_summary import FramePerformanceSummaryTool
 from .heap_dominator_tree_analyzer import HeapDominatorTreeAnalyzerTool
 from .jank_frames import JankFramesTool
 from .memory_leak_detector import MemoryLeakDetectorTool
+from .main_thread_hotspots import MainThreadHotspotTool
 
 __all__ = [
     "BaseTool",
@@ -27,4 +28,5 @@ __all__ = [
     "HeapDominatorTreeAnalyzerTool",
     "JankFramesTool",
     "MemoryLeakDetectorTool",
+    "MainThreadHotspotTool",
 ]
