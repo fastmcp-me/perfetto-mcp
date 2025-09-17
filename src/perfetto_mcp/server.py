@@ -5,6 +5,7 @@ import logging
 from mcp.server.fastmcp import FastMCP
 from .connection_manager import ConnectionManager
 from .tools.slice_info import SliceInfoTool
+from .tools.find_slices import SliceFinderTool
 from .tools.sql_query import SqlQueryTool
 from .tools.anr_detection import AnrDetectionTool
 from .resource import register_resources
@@ -36,6 +37,7 @@ def create_server() -> FastMCP:
     
     # Create tool instances
     slice_info_tool = SliceInfoTool(connection_manager)
+    slice_finder_tool = SliceFinderTool(connection_manager)
     sql_query_tool = SqlQueryTool(connection_manager)
     anr_detection_tool = AnrDetectionTool(connection_manager)
     anr_root_cause_tool = AnrRootCauseTool(connection_manager)
@@ -49,34 +51,47 @@ def create_server() -> FastMCP:
 
 
     @mcp.tool()
-    def get_slice_info(trace_path: str, slice_name: str, process_name: str | None = None) -> str:
+    def find_slices(
+        trace_path: str,
+        pattern: str,
+        process_name: str | None = None,
+        match_mode: str = "contains",
+        limit: int = 100,
+        main_thread_only: bool = False,
+        time_range: dict | None = None,
+    ) -> str:
         """
-        Get comprehensive statistics and examples for a specific slice name in the trace.
+        Discover slices by name with flexible matching to quickly survey what's in a trace,
+        then get aggregates and linkable examples without writing SQL.
 
-        USE THIS WHEN: You need to quickly understand the performance characteristics of a 
-        specific operation/slice - its frequency, duration distribution, and worst cases. 
-        Perfect for initial investigation of known slice names like "DrawFrame", "bindApplication", 
-        or custom app markers.
+        WHY USE THIS:
+        - Explore unknown slice names and hot paths fast (no manual SQL).
+        - See frequency and duration stats (min/avg/max and p50/p90/p99 when available) per slice name.
+        - Get linkable examples (id, ts, dur, track_id) to jump in UI or correlate with other tools.
+        - Filter by process, main thread, and time range to narrow investigations.
 
-        NOT FOR: Complex filtering (duration > X, specific time ranges, multiple conditions) - 
-        use execute_sql_query instead.
+        PARAMETERS:
+        - pattern: String to match against slice names.
+        - match_mode: 'contains' (default), 'exact', or 'glob'.
+        - process_name: Optional filter; supports '*' wildcard.
+        - main_thread_only: Limit to process main threads.
+        - time_range: {'start_ms': X, 'end_ms': Y}.
+        - limit: Max example slices to return (default 100).
 
-        INPUT: 
-        - slice_name: Exact name (case-insensitive)
-
-        OUTPUT: 
-        - Total count and time span
-        - Duration statistics (min/avg/max in milliseconds)
-        - Up to 50 longest instances with full context (process, thread, timestamp)
-        - otherSlices: Up to 20 other slice names that contain the provided text (case-insensitive)
-
-        EXAMPLE: get_slice_info("trace.pb", "DrawFrame") returns frame rendering statistics
-        EXAMPLE: get_slice_info("trace.pb", "GC") returns garbage collection events
-
-        TYPICAL FOLLOW-UP: If you find problematic slices, use execute_sql_query to analyze 
-        their relationship to ANRs or jank events at specific timestamps.
+        OUTPUT:
+        - aggregates: Per-slice-name counts and duration stats (min/avg/max, p50/p90/p99 when available).
+        - examples: Top slices by duration with thread/process context and track id for linking.
+        - notes: Capability or fallback notices.
         """
-        return slice_info_tool.get_slice_info(trace_path, slice_name, process_name)
+        return slice_finder_tool.find_slices(
+            trace_path,
+            pattern,
+            process_name,
+            match_mode,
+            limit,
+            main_thread_only,
+            time_range,
+        )
 
 
     @mcp.tool()

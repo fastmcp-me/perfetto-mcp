@@ -25,7 +25,7 @@ src/perfetto_mcp/
 ├── tools/
 │   ├── __init__.py
 │   ├── base.py              # Base tool class with connection management and unified formatting
-│   ├── slice_info.py        # get_slice_info tool
+│   ├── find_slices.py       # find_slices tool
 │   ├── sql_query.py         # execute_sql_query tool
 │   ├── anr_detection.py     # detect_anrs tool
 │   ├── anr_root_cause.py    # anr_root_cause_analyzer tool
@@ -45,8 +45,9 @@ src/perfetto_mcp/
 
 ## Available Tools
 
-### 1. `get_slice_info(trace_path, slice_name, process_name=None)`
-Filter slices by name and return a structured JSON envelope with counts and sample data.
+### 1. `find_slices(trace_path, pattern, process_name=None, match_mode='contains', limit=100, main_thread_only=False, time_range=None)`
+Discover slices by flexible name matching and return aggregates plus examples without writing SQL.
+Returns a JSON envelope with `result = { matchMode, filters, timeRangeMs, aggregates: [...], examples: [...], notes }`.
 
 ### 2. `execute_sql_query(trace_path, sql_query, process_name=None)`
 Execute arbitrary SELECT SQL queries against the trace database and return all rows.
@@ -173,7 +174,7 @@ All tool calls return a consistent JSON envelope:
 ```
 
 Examples:
-- get_slice_info → `result = { sliceName, totalCount, sampleSlices: [{ ts, dur, name }] }`
+- find_slices → `result = { matchMode, filters, timeRangeMs, aggregates, examples, notes }`
 - execute_sql_query → `result = { query, columns, rows, rowCount }`
 - detect_anrs → `result = { totalCount, anrs: [...], filters: { ... } }`
 - anr_root_cause_analyzer → `result = { window, filters, mainThreadBlocks, binderDelays, memoryPressure, lockContention, insights, notes }`
@@ -201,7 +202,7 @@ Run the server (stdio):
 - `uv run python main.py`
 
 Example tool calls (high level):
-- `get_slice_info`: Provide `trace_path` and exact `slice_name` to summarize occurrences and show worst-duration examples.
+- `find_slices`: Provide `trace_path` and a `pattern` (default contains) to survey matching slices with stats and top examples.
 - `execute_sql_query`: Provide a SELECT query. Dangerous statements are rejected.
 - `detect_anrs`: Optionally filter by `process_name`, `min_duration_ms`, and a `{start_ms, end_ms}` window.
 - `anr_root_cause_analyzer`: Provide the process and either an `anr_timestamp_ms` with an `analysis_window_ms` or an explicit `time_range`.
