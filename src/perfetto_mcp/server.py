@@ -469,6 +469,11 @@ def create_server() -> FastMCP:
     def thread_contention_analyzer(
         trace_path: str,
         process_name: str,
+        time_range: dict | None = None,
+        min_block_ms: float = 50.0,
+        include_per_thread_breakdown: bool = False,
+        include_examples: bool = False,
+        limit: int = 80,
     ) -> str:
         """
         Find thread synchronization bottlenecks with automatic fallback analysis  - the hidden cause of most ANRs.
@@ -518,12 +523,25 @@ def create_server() -> FastMCP:
         - Fallback: Include linux.ftrace with sched/sched_switch, sched/sched_waking,
           and optionally sched/sched_blocked_reason events
 
+        PARAMETERS:
+        - process_name: Target app/process (supports exact name; use find_slices/process metadata tools for discovery)
+        - time_range: {'start_ms': X, 'end_ms': Y} to focus analysis on a specific window (e.g., app startup, ANR)
+        - min_block_ms: Ignore waits shorter than this threshold (default 50ms)
+        - include_per_thread_breakdown: Include per-thread S/D totals and percentages
+        - include_examples: Include top example waits for illustration
+        - limit: Cap for groups/examples/breakdown rows (default 80)
+
         FIX PRIORITY: Usually easy fixes with huge impact. Moving work outside synchronized
         blocks or using concurrent structures often solves the problem completely.
         """
         return thread_contention_tool.thread_contention_analyzer(
             trace_path,
             process_name,
+            time_range,
+            min_block_ms,
+            include_per_thread_breakdown,
+            include_examples,
+            limit,
         )
 
     @mcp.tool()

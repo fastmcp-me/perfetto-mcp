@@ -94,17 +94,17 @@ Analyzes the latest heap graph snapshot for a process to surface classes dominat
 Returns a JSON envelope with `result = { totalCount, classes: [{ display_name, instance_count, self_size_mb, native_size_mb, total_size_mb, avg_reachability, min_root_distance, memory_impact }], filters, notes }`.
 If extended heap graph columns or modules are missing, falls back to a simplified query (without `native_size_mb`, `avg_reachability`, `min_root_distance`) and adds a `notes` entry. If no heap graph exists in the trace, returns `HEAP_GRAPH_UNAVAILABLE`.
 
-### 10. `thread_contention_analyzer(trace_path, process_name)`
-Identifies thread contention and synchronization bottlenecks with automatic fallback.
+### 10. `thread_contention_analyzer(trace_path, process_name, time_range=None, min_block_ms=50.0, include_per_thread_breakdown=False, include_examples=False, limit=80)`
+Identifies thread contention and synchronization bottlenecks with time scoping, minimum-duration filtering, optional per-thread blocked-state breakdown, example waits, and automatic fallback when monitor contention data is unavailable.
 
-Returns a JSON envelope with `result = { totalCount, contentions: [...], filters, analysisSource, usesWakerLinkage?, usedSchedBlockedReason?, primaryDataUnavailable?, fallbackNotice? }` where each row contains:
-`{ blocked_thread_name, blocking_thread_name, short_blocking_method_name, contention_count, total_blocked_ms, avg_blocked_ms, max_blocked_ms, total_waiters, max_concurrent_waiters, severity }`.
+Returns a JSON envelope with `result = { totalCount, contentions: [...], filters, analysisSource, usesWakerLinkage?, usedSchedBlockedReason?, primaryDataUnavailable?, fallbackNotice?, timeRangeMs?, thresholds, dataDependencies, notes?, blocked_state_breakdown?, top_dstate_functions?, examples? }` where each contention row contains:
+`{ blocked_thread_name, blocking_thread_name, short_blocking_method_name, contention_count, total_blocked_ms, avg_blocked_ms, max_blocked_ms, total_waiters, max_concurrent_waiters, blocked_is_main_thread?, severity }`.
 
 Notes:
-- **Primary analysis**: Uses `android.monitor_contention` data when available for precise Java lock details.
-- **Automatic fallback**: Falls back to scheduler-based inference when monitor contention data is unavailable.
-- **Metadata fields**: Includes `analysisSource`, `usesWakerLinkage`, `usedSchedBlockedReason`, `primaryDataUnavailable`, and `fallbackNotice` for transparency.
-- Flags critical contentions that affect the main thread or exceed duration thresholds.
+- **Primary analysis**: Uses `android.monitor_contention` when available; `min_block_ms` filters out short waits before aggregation; `time_range` restricts to the window.
+- **Automatic fallback**: Infers from `thread_state` with waker linkage and optional `sched_blocked_reason` attribution; same `time_range` and thresholding.
+- **Breakdown**: If `include_per_thread_breakdown=True`, returns per-thread S/D totals and percentages for the same window.
+- **Examples**: If `include_examples=True`, returns the longest waits (from primary or fallback path) capped by `limit`.
 
 ### 11. `binder_transaction_profiler(trace_path, process_filter, min_latency_ms=10.0, include_thread_states=True)`
 Analyzes binder transaction performance and identifies bottlenecks using the `android.binder` module.
