@@ -1,6 +1,6 @@
-<div align="center"><b>Perfetto MCP</b></div>
+# Perfetto MCP
 
-Get answers from your traces. Perfetto MCP turns natural‑language prompts into focused Perfetto analyses so you can quickly explain jank, diagnose ANRs, spot CPU hot threads, uncover lock contention, and find memory leaks — without writing SQL. Point it at a trace and process, ask a question, and receive concise, actionable summaries with structured results you can drill into.
+This is a Model Context Protocol (MCP) server that gets answers from your Perfetto Traces. It turns natural‑language prompts into focused Perfetto analyses so you can quickly explain jank, diagnose ANRs, spot CPU hot threads, uncover lock contention, and find memory leaks — without writing SQL. Point it at a trace and process, ask a question, and receive concise, actionable summaries with structured results you can drill into.
 
 ## Prerequisites
 
@@ -106,6 +106,6 @@ Below are the available tools, how they help, and what to expect in the result. 
 
 ## License
 
-This project is licensed under the terms described in the `LICENSE` file.
+This project is licensed under the Apache 2.0 License. See the [LICENSE](https://github.com/antarikshc/perfetto-mcp/blob/main/LICENSE) file for details.
 
 
