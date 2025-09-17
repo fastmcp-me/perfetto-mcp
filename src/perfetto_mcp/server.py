@@ -4,7 +4,6 @@ import atexit
 import logging
 from mcp.server.fastmcp import FastMCP
 from .connection_manager import ConnectionManager
-from .tools.slice_info import SliceInfoTool
 from .tools.find_slices import SliceFinderTool
 from .tools.sql_query import SqlQueryTool
 from .tools.anr_detection import AnrDetectionTool
@@ -36,7 +35,6 @@ def create_server() -> FastMCP:
     connection_manager = ConnectionManager()
     
     # Create tool instances
-    slice_info_tool = SliceInfoTool(connection_manager)
     slice_finder_tool = SliceFinderTool(connection_manager)
     sql_query_tool = SqlQueryTool(connection_manager)
     anr_detection_tool = AnrDetectionTool(connection_manager)

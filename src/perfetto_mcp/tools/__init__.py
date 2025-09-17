@@ -1,7 +1,6 @@
 """Perfetto MCP Tools - Individual tool implementations for trace analysis."""
 
 from .base import BaseTool, ToolError
-from .slice_info import SliceInfoTool
 from .find_slices import SliceFinderTool
 from .sql_query import SqlQueryTool
 from .cpu_utilization import CpuUtilizationProfilerTool
@@ -17,7 +16,6 @@ from .memory_leak_detector import MemoryLeakDetectorTool
 __all__ = [
     "BaseTool",
     "ToolError",
-    "SliceInfoTool",
     "SqlQueryTool",
     "SliceFinderTool",
     "CpuUtilizationProfilerTool",
