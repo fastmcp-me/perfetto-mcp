@@ -106,11 +106,18 @@ Notes:
 - **Breakdown**: If `include_per_thread_breakdown=True`, returns per-thread S/D totals and percentages for the same window.
 - **Examples**: If `include_examples=True`, returns the longest waits (from primary or fallback path) capped by `limit`.
 
-### 11. `binder_transaction_profiler(trace_path, process_filter, min_latency_ms=10.0, include_thread_states=True)`
+### 11. `binder_transaction_profiler(trace_path, process_filter, min_latency_ms=10.0, include_thread_states=True, time_range=None, correlate_with_main_thread=False, group_by=None)`
 Analyzes binder transaction performance and identifies bottlenecks using the `android.binder` module.
 
-Returns a JSON envelope with `result = { totalCount, transactions: [...], filters }` where each row contains:
-`{ client_process, server_process, aidl_name, method_name, client_latency_ms, server_latency_ms, overhead_ms, is_main_thread, is_sync, top_thread_states, latency_severity }`.
+Returns a JSON envelope with results depending on `group_by`:
+- When `group_by=None`: `result = { totalCount, timeRangeMs?, transactions: [...], filters }` where each row contains:
+  `{ client_process, server_process, aidl_name, method_name, client_latency_ms, server_latency_ms, overhead_ms, overhead_ratio, is_main_thread, is_sync, top_thread_states, main_thread_top_states?, latency_severity }`.
+- When grouped (`'aidl'` or `'server_process'`): `result = { totalCount, timeRangeMs?, aggregates: [...], filters }` with aggregated counts and average latencies/overheads.
+
+Parameters:
+- `time_range`: Optional `{'start_ms': X, 'end_ms': Y}` to scope the analysis window by client timestamp.
+- `correlate_with_main_thread`: If true, adds a best‑effort summary of client main-thread states for main-thread transactions.
+- `group_by`: One of `None`, `'aidl'`, `'server_process'` to switch to aggregated views.
 
 Notes:
 - Requires `android.binder` views (`android_binder_txns`, `android_sync_binder_thread_state_by_txn`). If unavailable, returns `BINDER_DATA_UNAVAILABLE`.

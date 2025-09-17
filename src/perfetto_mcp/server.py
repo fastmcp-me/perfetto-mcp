@@ -550,6 +550,9 @@ def create_server() -> FastMCP:
         process_filter: str,
         min_latency_ms: float = 10.0,
         include_thread_states: bool = True,
+        time_range: dict | None = None,
+        correlate_with_main_thread: bool = False,
+        group_by: str | None = None,
     ) -> str:
         """
         Analyze cross-process (IPC) communication performance and bottlenecks.
@@ -568,6 +571,9 @@ def create_server() -> FastMCP:
         - process_filter: Match as client OR server
         - min_latency_ms: Focus on slow calls (default 10ms)
         - include_thread_states: Show what threads were doing during call
+        - time_range: Optional {'start_ms': X, 'end_ms': Y} to scope analysis window
+        - correlate_with_main_thread: If true, add best-effort main-thread state summary
+        - group_by: One of None, 'aidl', 'server_process' for aggregated views
 
         KEY METRICS:
         - is_main_thread=true + latency>100ms = ANR risk
@@ -580,8 +586,8 @@ def create_server() -> FastMCP:
         - Synchronous LocationManager/SensorManager calls
         - PackageManager operations on main thread
 
-        OUTPUT: Transaction list with client/server processes, methods, latencies, and severity. 
-        Focus on main thread transactions first.
+        OUTPUT: When group_by is None, returns transaction rows with latencies and overhead_ratio. 
+        When grouped, returns aggregates by AIDL method or server process.
 
         ARCHITECTURE INSIGHT: High binder latency often indicates the need to make calls 
         asynchronous or cache results. Consider using AsyncTask, coroutines, or caching layers.
@@ -594,6 +600,9 @@ def create_server() -> FastMCP:
             process_filter,
             min_latency_ms,
             include_thread_states,
+            time_range,
+            correlate_with_main_thread,
+            group_by,
         )
 
     @mcp.tool()
