@@ -97,7 +97,7 @@ def create_server() -> FastMCP:
     @mcp.tool()
     def execute_sql_query(trace_path: str, sql_query: str, process_name: str | None = None) -> str:
         """
-        Execute custom SQL queries on trace data for advanced analysis.
+        Execute PerfettoSQL scripts (multi-statement) on trace data for advanced analysis.
 
         USE THIS WHEN: Other tools don't provide what you need, you need complex filtering/joins, 
         or you want to correlate data across multiple tables. This is your power tool for custom 
@@ -113,8 +113,8 @@ def create_server() -> FastMCP:
         - android_binder_txns: Cross-process calls
         - heap_graph_*: Memory heap analysis
 
-        SECURITY: Only SELECT queries allowed (no modifications). No automatic LIMIT is applied; 
-        large queries may return many rows.
+        SECURITY: Accepts full PerfettoSQL/SQLite scripts. No automatic LIMIT is applied; large
+        queries may return many rows. The script is executed verbatim by TraceProcessor.
 
         COMMON PATTERNS:
         - Duration analysis: "SELECT name, dur/1e6 as ms FROM slice WHERE dur > 10e6"
@@ -122,8 +122,13 @@ def create_server() -> FastMCP:
         - Time filtering: "SELECT * FROM slice WHERE ts BETWEEN 1e9 AND 2e9"
         - Process filtering: "SELECT * FROM thread WHERE upid IN (SELECT upid FROM process WHERE name LIKE '%chrome%')"
 
-        POWER USER TIP: Join android_anrs with slice/thread_state tables to understand 
-        what was happening during ANR events.
+        POWER USER TIP: Use `INCLUDE PERFETTO MODULE ...` statements to load standard library
+        modules (supports wildcards like `android.*`). You can also use `CREATE PERFETTO TABLE`/
+        `VIEW`/`FUNCTION`/`MACRO`/`INDEX` where supported by TraceProcessor.
+
+        References:
+        - PerfettoSQL Syntax: https://perfetto.dev/docs/analysis/perfetto-sql-syntax
+        - Standard Library (Prelude): https://perfetto.dev/docs/analysis/stdlib-docs#package-prelude
         """
         return sql_query_tool.execute_sql_query(trace_path, sql_query, process_name)
 

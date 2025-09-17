@@ -50,7 +50,16 @@ Discover slices by flexible name matching and return aggregates plus examples wi
 Returns a JSON envelope with `result = { matchMode, filters, timeRangeMs, aggregates: [...], examples: [...], notes }`.
 
 ### 2. `execute_sql_query(trace_path, sql_query, process_name=None)`
-Execute arbitrary SELECT SQL queries against the trace database and return all rows.
+Execute PerfettoSQL scripts (multi-statement) against the trace database. The script is executed
+verbatim by TraceProcessor. If the final statement is a `SELECT`, rows are returned; otherwise,
+the result has `rowCount = 0` and `columns = []`.
+
+Notes:
+- Supports full PerfettoSQL, including `INCLUDE PERFETTO MODULE` (wildcards allowed where supported),
+  `CREATE PERFETTO TABLE/VIEW/INDEX/MACRO/FUNCTION`, and standard SQLite statements (e.g., `PRAGMA`).
+- No automatic `LIMIT` is applied. Consider adding `LIMIT` to avoid large result sets.
+- Guardrails: the server enforces basic caps (script size and optional statement count). Scripts are
+  otherwise passed through without keyword blocking.
 
 ### 3. `detect_anrs(trace_path, process_name=None, min_duration_ms=5000, time_range=None)`
 Detect Application Not Responding (ANR) events in Android traces with contextual details and severity analysis.
@@ -175,7 +184,7 @@ All tool calls return a consistent JSON envelope:
 
 Examples:
 - find_slices → `result = { matchMode, filters, timeRangeMs, aggregates, examples, notes }`
-- execute_sql_query → `result = { query, columns, rows, rowCount }`
+- execute_sql_query → `result = { query, columns, rows, rowCount, scriptStatementCount?, lastStatementType?, returnsRows }`
 - detect_anrs → `result = { totalCount, anrs: [...], filters: { ... } }`
 - anr_root_cause_analyzer → `result = { window, filters, mainThreadBlocks, binderDelays, memoryPressure, lockContention, insights, notes }`
 - cpu_utilization_profiler → `result = { processName, groupBy, summary, threads, frequency }`
