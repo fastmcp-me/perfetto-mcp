@@ -1,7 +1,7 @@
 [project]
-name = "perfetto-mcp-server"
+name = "perfetto-mcp"
 version = "0.1.0"
-description = "Add your description here"
+description = "A Model Context Protocol server for analyzing Perfetto trace files."
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
@@ -9,3 +9,16 @@ dependencies = [
     "perfetto>=0.14.0",
     "protobuf<5",
 ]
+
+[build-system]
+requires = ["hatchling>=1.26"]
+build-backend = "hatchling.build"
+
+[project.scripts]
+perfetto-mcp = "perfetto_mcp:main"
+
+[tool.hatch.build]
+sources = ["src"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/perfetto_mcp"]
