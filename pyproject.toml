@@ -21,4 +21,4 @@ perfetto-mcp = "perfetto_mcp:main"
 sources = ["src"]
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/perfetto_mcp"]
+packages = ["perfetto_mcp"]

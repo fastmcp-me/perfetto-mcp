@@ -12,3 +12,6 @@ wheels/
 .cursor
 
 .DS_Store
+
+AGENTS.md
+CLAUDE.md
