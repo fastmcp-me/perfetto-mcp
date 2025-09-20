@@ -3,7 +3,7 @@ name = "perfetto-mcp"
 version = "0.1.0"
 description = "A Model Context Protocol server for analyzing Perfetto trace files."
 readme = "README.md"
-requires-python = ">=3.13"
+requires-python = ">=3.10"
 dependencies = [
     "mcp[cli]>=1.12.1",
     "perfetto>=0.14.0",
