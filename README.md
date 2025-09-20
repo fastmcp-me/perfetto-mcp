@@ -4,15 +4,112 @@ This is a Model Context Protocol (MCP) server that gets answers from your Perfet
 
 ## Prerequisites
 
-- Python 3.13+ installed on your system (python.org, Homebrew, or your distro package manager)
+- Python 3.13+ (macOS/Homebrew):
+```bash
+brew install python@3.13
+```
+- uv (recommended):
+```bash
+brew install uv
+```
 
 ## Getting Started
 
-Installation instructions coming soon.
+<details>
+<summary><strong>Install in Cursor</strong></summary>
+
+Add to `~/.cursor/mcp.json` (global) or `.cursor/mcp.json` (project):
+
+```json
+{
+  "mcpServers": {
+    "perfetto-mcp": {
+      "command": "uvx",
+      "args": ["perfetto-mcp"]
+    }
+  }
+}
+```
+
+</details>
+
+
+<details>
+<summary><strong>Install in Claude Code</strong></summary>
+
+```bash
+# Add to user scope
+claude mcp add perfetto-mcp --scope user -- uvx perfetto-mcp
+```
+
+Or edit `~/Library/Application Support/Claude/claude.json` (macOS) or `%APPDATA%\\Claude\\claude.json` (Windows):
+
+```json
+{
+  "mcpServers": {
+    "perfetto-mcp": {
+      "command": "uvx",
+      "args": ["perfetto-mcp"]
+    }
+  }
+}
+```
+
+</details>
+
+
+<details>
+<summary><strong>Install in VS Code</strong></summary>
+
+Add to `.vscode/mcp.json` (project) or run "MCP: Add Server" command:
+
+```json
+{
+  "mcpServers": {
+    "perfetto-mcp": {
+      "command": "uvx",
+      "args": ["perfetto-mcp"]
+    }
+  }
+}
+```
+
+Enable in GitHub Copilot Chat's Agent mode.
+
+</details>
+
+
+<details>
+<summary><strong>Install in Codex</strong></summary>
+
+Edit `~/.codex/config.toml`:
+
+```toml
+[mcp_servers.perfetto-mcp]
+command = "uvx"
+args = ["perfetto-mcp"]
+```
+
+</details>
+
+
+### Local Installation
+
+#### Using pip
+```bash
+pip3 install perfetto-mcp
+python3 -m perfetto_mcp
+```
+
+#### Using uv (recommended)
+```bash
+uvx perfetto-mcp
+```
+
 
 ## How to use?
 
-Most tools require:
+All tools require:
 - **trace_path**: Absolute path to your Perfetto trace file (e.g., `.pftrace`, `.perfetto-trace`).
 - **process_name**: Target process/app name (exact or wildcard where supported, e.g., `com.example.app`).
 
