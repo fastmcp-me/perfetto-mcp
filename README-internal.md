@@ -15,8 +15,10 @@ The server is organized into a modular structure:
 
 ```
 src/perfetto_mcp/
-├── __init__.py              # Package initialization
-├── server.py                # Main MCP server setup with lifecycle management
+├── __init__.py              # Package initialization and stdio entrypoint
+├── __main__.py              # Enables `python -m perfetto_mcp`
+├── server.py                # MCP server setup with lifecycle management
+├── dev.py                   # Dev entry for `mcp dev` (exports `mcp`)
 ├── connection_manager.py    # Persistent TraceProcessor connection management
 ├── resource/                # MCP resources registration
 │   ├── __init__.py          # register_resources(mcp)
@@ -24,17 +26,22 @@ src/perfetto_mcp/
 │   └── trace_analysis.py    # trace analysis URL resource
 ├── tools/
 │   ├── __init__.py
-│   ├── base.py              # Base tool class with connection management and unified formatting
-│   ├── find_slices.py       # find_slices tool
-│   ├── sql_query.py         # execute_sql_query tool
-│   ├── anr_detection.py     # detect_anrs tool
-│   ├── anr_root_cause.py    # anr_root_cause_analyzer tool
-│   ├── cpu_utilization.py   # cpu_utilization_profiler tool
-│   ├── jank_frames.py       # detect_jank_frames tool
-│   └── frame_performance_summary.py  # frame_performance_summary tool
+│   ├── base.py                             # Base tool with connection mgmt + formatting
+│   ├── find_slices.py                      # find_slices tool
+│   ├── sql_query.py                        # execute_sql_query tool
+│   ├── anr_detection.py                    # detect_anrs tool
+│   ├── anr_root_cause.py                   # anr_root_cause_analyzer tool
+│   ├── cpu_utilization.py                  # cpu_utilization_profiler tool
+│   ├── jank_frames.py                      # detect_jank_frames tool
+│   ├── frame_performance_summary.py        # frame_performance_summary tool
+│   ├── memory_leak_detector.py             # memory_leak_detector tool
+│   ├── heap_dominator_tree_analyzer.py     # heap_dominator_tree_analyzer tool
+│   ├── thread_contention_analyzer.py       # thread_contention_analyzer tool
+│   ├── binder_transaction_profiler.py      # binder_transaction_profiler tool
+│   └── main_thread_hotspots.py             # main_thread_hotspot_slices tool
 └── utils/
     ├── __init__.py
-    └── query_helpers.py     # SQL query utilities and validation
+    └── query_helpers.py     # SQL script guardrails and formatting helpers
 ```
 
 ### Key Components
@@ -146,8 +153,9 @@ Notes:
 - `uv add <package>` - Add new dependency
 
 **Running the Server:**
-- `uv run mcp dev main.py` - Run MCP server with development tooling
-- `uv run python main.py` - Run MCP server directly
+- `uv run mcp dev src/perfetto_mcp/dev.py` - Run MCP server with development tooling
+- `uv run -m perfetto_mcp` - Run MCP server directly (stdio)
+- `uvx perfetto-mcp` - Run installed console script
 
 **Testing:**
 - `uv run pytest -q` - Run test suite (when tests are added)
@@ -172,8 +180,9 @@ The server maintains backward compatibility with the original error handling whi
 
 ## Safety Features
 
-- **SQL Validation**: Only SELECT queries are allowed for security
-- **Query Sanitization**: Basic validation to prevent dangerous operations
+- **Permissive PerfettoSQL execution**: Scripts are executed verbatim by TraceProcessor
+- **Guardrails**: Script size and statement-count caps (env-configurable); no keyword blocking
+- **No automatic LIMIT**: Consider adding `LIMIT` to avoid large result sets
 
 ## Tool Output Schema
 
@@ -200,7 +209,7 @@ Examples:
 
 ## Dependencies
 
-- Requires Python >=3.13
+- Requires Python >=3.10 (3.13+ recommended)
 - Key packages: `mcp[cli]`, `perfetto`, `protobuf<5`
 
 ## Shutdown Handling
@@ -214,8 +223,9 @@ The server implements multiple cleanup strategies:
 ## Usage Examples
 
 Run the server (stdio):
-- `uv run mcp dev main.py` (with dev tooling), or
-- `uv run python main.py`
+- `uv run mcp dev src/perfetto_mcp/dev.py` (with dev tooling), or
+- `uv run -m perfetto_mcp`, or
+- `uvx perfetto-mcp`
 
 Example tool calls (high level):
 - `find_slices`: Provide `trace_path` and a `pattern` (default contains) to survey matching slices with stats and top examples.
