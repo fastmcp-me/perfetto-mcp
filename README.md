@@ -12,6 +12,8 @@ A Model Context Protocol (MCP) server that transforms natural-language prompts i
 - **Thread Contention**: Find synchronization bottlenecks and lock contention
 - **Binder Profiling**: Analyze IPC performance and slow system interactions
 
+![til](./static/Perfetto-mcp-showcase.gif)
+
 ## 📋 Prerequisites
 
 - **Python 3.13+** (macOS/Homebrew):
