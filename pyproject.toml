@@ -1,6 +1,6 @@
 [project]
 name = "perfetto-mcp"
-version = "0.1.1"
+version = "0.1.2"
 description = "A Model Context Protocol server for analyzing Perfetto trace files."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -21,9 +21,17 @@ perfetto-mcp = "perfetto_mcp:main"
 
 [tool.hatch.build]
 sources = ["src"]
+exclude = [
+  "static/**",
+]
 
 [tool.hatch.build.targets.wheel]
 packages = ["perfetto_mcp"]
+
+[tool.hatch.build.targets.sdist]
+exclude = [
+  "static/**",
+]
 
 [tool.hatch.build.targets.wheel.force-include]
 "docs/Perfetto-MCP-Concepts.md" = "perfetto_mcp/docs/Perfetto-MCP-Concepts.md"

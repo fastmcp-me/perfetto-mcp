@@ -107,12 +107,12 @@ args = ["perfetto-mcp"]
 
 </details>
 
-### Local Install
+### Local Install (development server)
 
 ```bash
 cd perfetto-mcp-server
 uv sync
-PYTHONPATH=src uv run -m perfetto_mcp
+uv run mcp dev src/perfetto_mcp/dev.py
 ```
 <details>
 <summary><strong>Local MCP</strong></summary>
