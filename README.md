@@ -27,13 +27,12 @@ A Model Context Protocol (MCP) server that transforms natural-language prompts i
 
 ## 🚀 Getting Started
 
-
-### IDE Integration
-
 <details>
 <summary><strong>Cursor</strong></summary>
 
-Add to `~/.cursor/mcp.json` (global) or `.cursor/mcp.json` (project):
+[![Install MCP Server](https://cursor.com/deeplink/mcp-install-dark.svg)](https://cursor.com/install-mcp?name=perfetto-mcp&config=eyJjb21tYW5kIjoidXZ4IHBlcmZldHRvLW1jcCJ9)
+
+Or add to `~/.cursor/mcp.json` (global) or `.cursor/mcp.json` (project):
 
 ```json
 {
@@ -51,12 +50,14 @@ Add to `~/.cursor/mcp.json` (global) or `.cursor/mcp.json` (project):
 <details>
 <summary><strong>Claude Code</strong></summary>
 
+Run this command. See [Claude Code MCP docs](https://docs.anthropic.com/en/docs/claude-code/mcp) for more info.
+
 ```bash
 # Add to user scope
 claude mcp add perfetto-mcp --scope user -- uvx perfetto-mcp
 ```
 
-Or edit `~/Library/Application Support/Claude/claude.json` (macOS) or `%APPDATA%\Claude\claude.json` (Windows):
+Or edit `~/claude.json` (macOS) or `%APPDATA%\Claude\claude.json` (Windows):
 
 ```json
 {
@@ -74,7 +75,9 @@ Or edit `~/Library/Application Support/Claude/claude.json` (macOS) or `%APPDATA%
 <details>
 <summary><strong>VS Code</strong></summary>
 
-Add to `.vscode/mcp.json` (project) or run "MCP: Add Server" command:
+[<img alt="Install in VS Code" src="https://img.shields.io/badge/VS_Code-VS_Code?style=flat-square&label=Install%20Perfetto%20MCP&color=0098FF">](https://insiders.vscode.dev/redirect?url=vscode%3Amcp%2Finstall%3F%7B%22name%22%3A%22perfetto-mcp%22%2C%22type%22%3A%22stdio%22%2C%22command%22%3A%22uvx%22%2C%22args%22%3A%5B%22perfetto-mcp%22%5D%7D)
+
+or add to `.vscode/mcp.json` (project) or run "MCP: Add Server" command:
 
 ```json
 {
@@ -107,8 +110,31 @@ args = ["perfetto-mcp"]
 ### Local Install
 
 ```bash
-uvx perfetto-mcp
+cd perfetto-mcp-server
+uv sync
+PYTHONPATH=src uv run -m perfetto_mcp
 ```
+<details>
+<summary><strong>Local MCP</strong></summary>
+
+```json
+{
+  "mcpServers": {
+    "perfetto-mcp-local": {
+      "command": "uv",
+      "args": [
+        "--directory",
+        "/path/to/git/repo/perfetto-mcp",
+        "run",
+        "-m",
+        "perfetto_mcp"
+      ],
+      "env": { "PYTHONPATH": "src" }
+    }
+  }
+}
+```
+</details>
 
 <details>
 <summary><strong>Using pip</strong></summary>
