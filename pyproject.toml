@@ -24,3 +24,6 @@ sources = ["src"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["perfetto_mcp"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"docs/Perfetto-MCP-Concepts.md" = "perfetto_mcp/docs/Perfetto-MCP-Concepts.md"
